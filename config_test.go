@@ -26,3 +26,21 @@ func TestReadCfgFile(t *testing.T) {
 	file2 := "./test/xlsx_sample_wrong.config"
 	assert.Panics(t, func() { readCfgFile(file2) })
 }
+
+func TestReadCfgLine(t *testing.T) {
+	tests := []struct {
+		in      string
+		isError bool
+	}{
+		{"SAMPLEONE Sample.xlsx", false},
+		{"SAMPLETHREE,SAMPLEFOUR Sample.xlsx", false},
+		{" SAMPLETWO Sample.xlsx ", false},
+		{"SAMPLEONE  Sample.xlsx", true}, // Duplicate
+		{"SAMPLEONE", true},
+		{"SAMPLEONE SAMPLETWO Sample.xlsx", true},
+	}
+
+	for _, test := range tests {
+		assert.Equal(t, test.isError, readCfgLine(test.in) != nil)
+	}
+}

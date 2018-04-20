@@ -8,6 +8,7 @@ import (
 
 // ProtoRow is used to generate proto file
 type ProtoRow struct {
+	varIdx  uint32
 	vars    []*SheetHead
 	repeats []*Repeat
 }
@@ -21,15 +22,12 @@ const (
 	RowData
 )
 
-// Typ is type names for proto2
-type Typ string
-
 // Field type for proto2
 const (
-	Req Typ = "required"
-	Opt Typ = "optional"
-	Rep Typ = "repeated"
-	OS  Typ = "optional_struct"
+	Req = "required"
+	Opt = "optional"
+	Rep = "repeated"
+	OS  = "optional_struct"
 )
 
 // SheetHead contains fields for .proto file
@@ -53,4 +51,18 @@ func readSheet(sheet *xlsx.Sheet) error {
 	}
 
 	return nil
+}
+
+func readHeads(sheet *xlsx.Sheet) {
+	//sheetName := sheet.Name
+
+	for colIdx := 0; colIdx < sheet.MaxCol; colIdx++ {
+
+		// Attr
+		switch sheet.Cell(0, colIdx).Value {
+		case Req, Opt:
+		case Rep:
+		case OS:
+		}
+	}
 }

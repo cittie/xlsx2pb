@@ -12,7 +12,7 @@ import (
 var (
 	configRegexp = "xlsx*.config"
 	sheetNames   map[string]struct{} // check if duplicate sheet name exists
-	sheetFileMap map[string][]string // map[filename][]sheetname
+	sheetFileMap map[string][]string // map[filename][]sheetnames, e.g. ["Sheet1", "Sheet2, Sheet3"]
 	fileHashMap  map[string][16]byte // map[filename]MD5
 )
 
@@ -52,27 +52,28 @@ func readCfgFile(cfgFile string) {
 }
 
 func readCfgLine(cfgLine string) error {
-	parts := strings.Split(cfgLine, " ")
+	parts := strings.Fields(cfgLine)
 	if len(parts) != 2 {
 		return fmt.Errorf("%v is illegel in config", cfgLine)
 	}
 
-	sheets := strings.Split(parts[0], ",")
 	filename := parts[1]
 
-	for _, sheet := range sheets {
-		if _, ok := sheetFileMap[filename]; !ok {
-			sheetFileMap[filename] = make([]string, 0)
-		}
+	if _, ok := sheetFileMap[filename]; !ok {
+		sheetFileMap[filename] = make([]string, 0)
+	}
 
-		// check if duplicate sheet name exists
+	// check if duplicate sheet name exists
+	sheets := strings.Split(parts[0], ",")
+	for _, sheet := range sheets {
 		if _, ok := sheetNames[sheet]; ok {
 			return fmt.Errorf("%v name duplicates", sheet)
 		}
 
 		sheetNames[sheet] = struct{}{}
-		sheetFileMap[filename] = append(sheetFileMap[filename], sheet)
 	}
+
+	sheetFileMap[filename] = append(sheetFileMap[filename], parts[0])
 
 	return nil
 }

@@ -12,11 +12,10 @@ func main() {
 	isCacheOn = *flag.Bool("cache", true, "Use cache to check if .proto file needs to update")
 
 	if isCacheOn {
-		cacheInit()
-		// generate with cache
-		writeCache()
-	} else {
-		// generate without cache
+		CacheInit()
 	}
 
+	if isCacheOn {
+
+	}
 }

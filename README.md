@@ -1,13 +1,15 @@
 # xlsx2pb
+
 convert xlsx to protobuf
 
-## Installation ##
+## Installation
 
 `go get -u github.com/cittie/xlsx2pb`
 
 `go install github.com/cittie/xlsx2pb`
 
-## Usage ##
+## Usage
+
 Generate config files as "xlsx_xxxxx.config" in xlsx directory with the following content:
 
 `SHEETNAME4 XLSXFILENAME2.xlsx`
@@ -20,5 +22,12 @@ Then run the command:
 
 `xlsx2pb xlsx_input_path proto_output_path`
 
-## Notice ##
+## Params
+
+Use following param to turn off cache:
+
+`-cache=false`
+
+## Notice
+
 * Sheets in xlsx should be capitalized and use different sheet names.

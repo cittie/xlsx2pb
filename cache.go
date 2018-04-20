@@ -1,36 +1,79 @@
 package xlsx2pb
 
-import "os"
+import (
+	"encoding/json"
+	"io/ioutil"
+	"os"
+)
 
 var (
-	isCacheOn     bool // if cache mechanism will be used
-	cacheFileName = "./cache/sheetcache"
+	isCacheOn     bool
+	cacheFileName = "./cache/sheetcache.json"
 	cacher        *Cacher
 )
 
 // Cacher is handler for cache
 type Cacher struct {
-	xlsxInfos []*XlsxInfo
+	XlsxInfos map[string]*XlsxInfo `json:"xlsxinfos"`
 }
 
 // XlsxInfo contains sheet information in xlsx files
 type XlsxInfo struct {
-	SheetName string
-	MD5       [16]byte
+	FileName string   `json:"filename"`
+	MD5      [16]byte `json:"md5"`
 }
 
-func cacheInit() {
-	cacher = new(Cacher)
+// CacheInit initialize cacher and read from file
+func CacheInit() {
+	cacher = newCacher()
 
 	if _, err := os.Stat(cacheFileName); err == nil {
-		readCache()
+		cacher.Load()
 	}
 }
 
-func readCache() {
+func newCacher() *Cacher {
+	cacher := new(Cacher)
+	cacher.XlsxInfos = make(map[string]*XlsxInfo)
 
+	return cacher
 }
 
-func writeCache() {
+// Load read data from json cache file
+func (c *Cacher) Load() error {
+	rawData, err := ioutil.ReadFile(cacheFileName)
+	if err != nil {
+		return err
+	}
 
+	err = json.Unmarshal(rawData, cacher)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// Save write current data to cache file as json
+func (c *Cacher) Save() error {
+	rawData, err := json.Marshal(cacher)
+	if err != nil {
+		return err
+	}
+
+	err = ioutil.WriteFile(cacheFileName, rawData, 0644)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// ClearCache remove saved records and initialize a new cacher
+func ClearCache() {
+	if _, err := os.Stat(cacheFileName); err == nil {
+		os.Remove(cacheFileName)
+	}
+
+	cacher = newCacher()
 }
