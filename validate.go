@@ -5,6 +5,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"strings"
 )
 
 func getFileMD5(path string) []byte {
@@ -20,4 +21,13 @@ func getFileMD5(path string) []byte {
 	}
 
 	return hash.Sum(nil)[:]
+}
+
+// IsTitleValid check if the first letter of a xlsx title is uppercase.
+func IsTitleValid(title string) bool {
+	if len(title) == 0 {
+		return false
+	}
+
+	return strings.Title(title) == title
 }

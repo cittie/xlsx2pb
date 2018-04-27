@@ -8,9 +8,22 @@ import (
 
 // ProtoRow is used to generate proto file
 type ProtoRow struct {
-	varIdx  uint32
+	ProtoIn
+	ProtoOut
+}
+
+// ProtoIn contains data read from xlsx
+type ProtoIn struct {
+	Name    string
 	vars    []*SheetHead
 	repeats []*Repeat
+}
+
+// ProtoOut controls how to output proto file
+type ProtoOut struct {
+	varIdx   int
+	tabCount int
+	outProto []string
 }
 
 // Row index in sheet
@@ -32,9 +45,10 @@ const (
 
 // SheetHead contains fields for .proto file
 type SheetHead struct {
-	attr int
-	typ  int
-	name string
+	attr    int
+	typ     string
+	name    string
+	comment string
 }
 
 // Repeat contains repeat filed for .proto file
@@ -42,7 +56,16 @@ type Repeat struct {
 	maxLength   int
 	fieldName   string
 	fieldLength int
-	fields      []SheetHead
+	repeatIdx   int
+	comment     string
+	fields      []*SheetHead
+}
+
+func newProtoRow() *ProtoRow {
+	pr := new(ProtoRow)
+	pr.varIdx = 1
+
+	return pr
 }
 
 func readSheet(sheet *xlsx.Sheet) error {
@@ -54,13 +77,18 @@ func readSheet(sheet *xlsx.Sheet) error {
 }
 
 func readHeads(sheet *xlsx.Sheet) {
-	//sheetName := sheet.Name
+	pr := newProtoRow()
+	pr.Name = sheet.Name
 
 	for colIdx := 0; colIdx < sheet.MaxCol; colIdx++ {
-
-		// Attr
 		switch sheet.Cell(0, colIdx).Value {
 		case Req, Opt:
+			head := new(SheetHead)
+			head.typ = sheet.Cell(1, colIdx).Value
+			head.name = sheet.Cell(2, colIdx).Value
+			head.comment = sheet.Cell(3, colIdx).Value
+
+			pr.vars = append(pr.vars, head)
 		case Rep:
 		case OS:
 		}
