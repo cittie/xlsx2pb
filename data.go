@@ -37,10 +37,10 @@ const (
 
 // Field type for proto2
 const (
-	Req = "required"
-	Opt = "optional"
-	Rep = "repeated"
-	OS  = "optional_struct"
+	Req     = "required"
+	Opt     = "optional"
+	Rep     = "repeated"
+	OptStru = "optional_struct"
 )
 
 // SheetHead contains fields for .proto file
@@ -76,9 +76,11 @@ func readSheet(sheet *xlsx.Sheet) error {
 	return nil
 }
 
-func readHeads(sheet *xlsx.Sheet) {
+func readHeads(sheet *xlsx.Sheet) *ProtoRow {
 	pr := newProtoRow()
 	pr.Name = sheet.Name
+	var repeatLength, repeatStructLength int // These are counters for repeat structure
+	var curRepeat *Repeat
 
 	for colIdx := 0; colIdx < sheet.MaxCol; colIdx++ {
 		switch sheet.Cell(0, colIdx).Value {
@@ -88,9 +90,38 @@ func readHeads(sheet *xlsx.Sheet) {
 			head.name = sheet.Cell(2, colIdx).Value
 			head.comment = sheet.Cell(3, colIdx).Value
 
-			pr.vars = append(pr.vars, head)
+			if repeatLength == 0 {
+				pr.vars = append(pr.vars, head)
+			} else {
+				// read repeat struct but avoid duplicate
+				if len(curRepeat.fields) != curRepeat.fieldLength {
+					curRepeat.fields = append(curRepeat.fields, head)
+				}
+				// check if repeat ends
+				repeatStructLength--
+				if repeatStructLength == 0 {
+					repeatLength--
+				}
+			}
 		case Rep:
-		case OS:
+			rp := new(Repeat)
+			repeatLength, _ = sheet.Cell(1, colIdx).Int()
+			rp.maxLength = repeatLength
+			pr.repeats = append(pr.repeats, rp)
+			curRepeat = rp
+		case OptStru:
+			// struct length counter
+			if repeatStructLength != 0 {
+				repeatStructLength, _ = sheet.Cell(1, colIdx).Int()
+			}
+
+			// init struct
+			if curRepeat.maxLength == repeatLength {
+				curRepeat.fieldLength, _ = sheet.Cell(1, colIdx).Int()
+				curRepeat.fieldName = sheet.Cell(2, colIdx).Value
+			}
 		}
 	}
+
+	return pr
 }

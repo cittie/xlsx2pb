@@ -1,7 +1,9 @@
 package xlsx2pb
 
 import (
+	"bufio"
 	"fmt"
+	"os"
 	"strings"
 	"unicode"
 )
@@ -10,6 +12,8 @@ var (
 	// INDENT Use 2 spaces
 	INDENT    = "  "
 	curIndent string
+	outPrefix = "./proto/"
+	outSuffix = ".proto"
 )
 
 // GenProto genenate proto file content
@@ -118,6 +122,21 @@ func (pr *ProtoRow) AddMessageArray() {
 	pr.AddMessageHead(pr.Name + "_ARRAY")
 	pr.outProto = append(pr.outProto, fmt.Sprintf("%srepeated %s %s = 1;", curIndent, pr.Name, firstLetter2Lowercase(pr.Name)))
 	pr.AddMessageTail()
+}
+
+// Write output proto file to "./proto/sheetname.proto"
+func (pr *ProtoRow) Write() {
+	f, err := os.Create(outPrefix + pr.Name + outSuffix)
+	if err != nil {
+		panic(err)
+	}
+
+	w := bufio.NewWriter(f)
+	for _, line := range pr.outProto {
+		w.WriteString(line + "\n")
+	}
+
+	w.Flush()
 }
 
 func firstLetter2Lowercase(title string) string {
