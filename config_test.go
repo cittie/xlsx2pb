@@ -17,6 +17,8 @@ func TestGetConfigFiles(t *testing.T) {
 }
 
 func TestReadCfgFile(t *testing.T) {
+	ResetConfigCache()
+
 	file1 := "./test/xlsx_sample.config"
 
 	readCfgFile(file1)
@@ -28,6 +30,8 @@ func TestReadCfgFile(t *testing.T) {
 }
 
 func TestReadCfgLine(t *testing.T) {
+	ResetConfigCache()
+
 	tests := []struct {
 		in      string
 		isError bool
@@ -41,6 +45,6 @@ func TestReadCfgLine(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		assert.Equal(t, test.isError, readCfgLine(test.in) != nil)
+		assert.Equal(t, test.isError, readCfgLine(test.in) != nil, "test: %v", test)
 	}
 }

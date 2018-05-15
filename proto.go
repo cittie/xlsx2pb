@@ -85,8 +85,9 @@ func (pr *ProtoRow) AddMessageTail() {
 }
 
 // AddVal add a proto variable define
-func (pr *ProtoRow) AddVal(sh *SheetHead) {
+func (pr *ProtoRow) AddVal(sh *Val) {
 	pr.AddOneDefination(false, sh.comment, sh.typ, sh.name, &pr.varIdx)
+	sh.fieldNum = pr.varIdx
 }
 
 // AddRepeat add repeat struct
@@ -115,6 +116,7 @@ func (pr *ProtoRow) AddRepeatDefine(repeat *Repeat) {
 // AddRepeatTail add repeat declare
 func (pr *ProtoRow) AddRepeatTail(repeat *Repeat) {
 	pr.AddOneDefination(true, repeat.comment, repeat.fieldName, repeat.comment, &pr.varIdx)
+	repeat.fieldNum = pr.varIdx
 }
 
 // AddMessageArray add an array for current message as XXX_ARRAY
@@ -126,7 +128,9 @@ func (pr *ProtoRow) AddMessageArray() {
 
 // Write output proto file to "./proto/sheetname.proto"
 func (pr *ProtoRow) Write() {
-	f, err := os.Create(outPrefix + pr.Name + outSuffix)
+	f, err := os.Create(outPrefix + strings.ToLower(pr.Name) + outSuffix)
+	defer f.Close()
+
 	if err != nil {
 		panic(err)
 	}

@@ -2,7 +2,10 @@ package xlsx2pb
 
 import (
 	"fmt"
+	"math"
+	"os"
 
+	"github.com/golang/protobuf/proto"
 	"github.com/tealeg/xlsx"
 )
 
@@ -10,12 +13,13 @@ import (
 type ProtoRow struct {
 	ProtoIn
 	ProtoOut
+	buf *proto.Buffer
 }
 
 // ProtoIn contains data read from xlsx
 type ProtoIn struct {
 	Name    string
-	vars    []*SheetHead
+	vars    []*Val
 	repeats []*Repeat
 }
 
@@ -43,27 +47,31 @@ const (
 	OptStru = "optional_struct"
 )
 
-// SheetHead contains fields for .proto file
-type SheetHead struct {
-	attr    int
-	typ     string
-	name    string
-	comment string
+// Val contains fields for .proto file
+type Val struct {
+	colIdx   int
+	typ      string
+	name     string
+	comment  string
+	fieldNum int
 }
 
 // Repeat contains repeat filed for .proto file
 type Repeat struct {
+	colIdx      int
 	maxLength   int
 	fieldName   string
 	fieldLength int
+	fieldNum    int
 	repeatIdx   int
 	comment     string
-	fields      []*SheetHead
+	fields      []*Val
 }
 
 func newProtoRow() *ProtoRow {
 	pr := new(ProtoRow)
 	pr.varIdx = 1
+	pr.buf = proto.NewBuffer([]byte{})
 
 	return pr
 }
@@ -83,12 +91,19 @@ func readHeads(sheet *xlsx.Sheet) *ProtoRow {
 	var curRepeat *Repeat
 
 	for colIdx := 0; colIdx < sheet.MaxCol; colIdx++ {
-		switch sheet.Cell(0, colIdx).Value {
+		headType := sheet.Cell(0, colIdx).Value
+
+		if headType == "" {
+			continue
+		}
+
+		switch headType {
 		case Req, Opt:
-			head := new(SheetHead)
-			head.typ = sheet.Cell(1, colIdx).Value
-			head.name = sheet.Cell(2, colIdx).Value
-			head.comment = sheet.Cell(3, colIdx).Value
+			head := new(Val)
+			head.colIdx = colIdx
+			head.typ = sheet.Cell(RowType, colIdx).Value
+			head.name = sheet.Cell(RowID, colIdx).Value
+			head.comment = sheet.Cell(RowComment, colIdx).Value
 
 			if repeatLength == 0 {
 				pr.vars = append(pr.vars, head)
@@ -105,6 +120,7 @@ func readHeads(sheet *xlsx.Sheet) *ProtoRow {
 			}
 		case Rep:
 			rp := new(Repeat)
+			rp.colIdx = colIdx
 			repeatLength, _ = sheet.Cell(1, colIdx).Int()
 			rp.maxLength = repeatLength
 			pr.repeats = append(pr.repeats, rp)
@@ -124,4 +140,94 @@ func readHeads(sheet *xlsx.Sheet) *ProtoRow {
 	}
 
 	return pr
+}
+
+func (pr *ProtoRow) readData(sheet *xlsx.Sheet) {
+	// Add Tag
+	pr.buf.EncodeVarint(uint64(10)) // (1 << 3) | 2 = 10
+
+	data := make([]byte, 0)
+	for i := RowData; i < sheet.MaxRow; i++ {
+		if row := sheet.Rows[i]; len(row.Cells) != 0 && row.Cells[0].Value != "" {
+			data = append(data, pr.readRow(row)...)
+		}
+	}
+
+	pr.buf.EncodeRawBytes(data)
+}
+
+func (rp *Repeat) getCount(row *xlsx.Row) int {
+	valCount, err := row.Cells[rp.colIdx].Int()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err.Error())
+		return 0
+	}
+
+	return valCount
+}
+
+// readRow Marshal a row of data into binary data
+func (pr *ProtoRow) readRow(row *xlsx.Row) []byte {
+	rowBuff := proto.NewBuffer([]byte{})
+	for _, val := range pr.vars {
+		readCell(rowBuff, val, row.Cells[val.colIdx]) // Variable part of data
+	}
+
+	for _, repeat := range pr.repeats {
+		if rowCount := repeat.getCount(row); rowCount > 0 {
+			rowBuff.EncodeVarint(uint64((repeat.fieldNum << 3) | 2)) // Add Repeat Tag
+			rpData := make([]byte, 0)
+			fieldBuff := proto.NewBuffer([]byte{})
+			for count := 0; count < rowCount; count++ {
+				fieldBuff.Reset()
+				for _, val := range repeat.fields {
+					readCell(fieldBuff, val, row.Cells[val.colIdx+count*(repeat.fieldLength+1)]) // next variable position = current position + field length + 1
+				}
+				rpData = append(rpData, fieldBuff.Bytes()...)
+			}
+			rowBuff.EncodeRawBytes(rpData) // Add Repeat data
+		}
+	}
+
+	return rowBuff.Bytes()
+}
+
+// readCell add "Tag - Value" or "Tag - Length - Value" to buffer according to var type
+func readCell(b *proto.Buffer, val *Val, cell *xlsx.Cell) {
+	tag := func(wireType int) {
+		b.EncodeVarint(uint64((val.fieldNum << 3) | wireType))
+	}
+
+	switch val.typ {
+	case "int32", "int64", "uint32", "uint64":
+		tag(0)
+		intVal, err := cell.Int()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err.Error())
+			return
+		}
+		b.EncodeVarint(uint64(intVal))
+	case "sint32", "sint64":
+		tag(0)
+		intVal, err := cell.Int()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err.Error())
+			return
+		}
+		b.EncodeZigzag64(uint64(intVal))
+	case "float", "float64":
+		tag(1)
+		floatVal, err := cell.Float()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err.Error())
+			return
+		}
+		b.EncodeFixed64(math.Float64bits(floatVal))
+	case "string":
+		tag(2)
+		b.EncodeStringBytes(cell.Value) // length included
+	default:
+		fmt.Fprintf(os.Stderr, "invalid var type: %v\n", val.typ)
+		return
+	}
 }

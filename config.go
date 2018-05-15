@@ -17,6 +17,11 @@ var (
 )
 
 func init() {
+	ResetConfigCache()
+}
+
+// ResetConfigCache clear current config data
+func ResetConfigCache() {
 	sheetNames = make(map[string]struct{})
 	sheetFileMap = make(map[string][]string)
 	fileHashMap = make(map[string][16]byte)

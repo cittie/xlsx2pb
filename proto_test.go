@@ -12,16 +12,16 @@ func genTestProtoRow() *ProtoRow {
 	pr.Name = "TestProtoRow"
 
 	// Field
-	sh := &SheetHead{
-		attr:    0,
+	sh := &Val{
+		colIdx:  0,
 		typ:     "string",
 		name:    "TestField1",
 		comment: "* This is TestFiled1 *",
 	}
 
 	// Repeat Field
-	sh2 := &SheetHead{
-		attr:    1,
+	sh2 := &Val{
+		colIdx:  1,
 		typ:     "int64",
 		name:    "TestRepeat1",
 		comment: "** This is TestRepeat1 **",

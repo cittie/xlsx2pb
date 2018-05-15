@@ -31,3 +31,15 @@ Use following param to turn off cache:
 ## Notice
 
 * Sheets in xlsx should be capitalized and use different sheet names.
+* bool type accept "false" or empty cell as false.
+
+## Support data types
+
+* float(float64)
+* int32
+* int64
+* uint32
+* uint64
+* sint32
+* sint64
+* string

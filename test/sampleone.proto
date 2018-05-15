@@ -1,0 +1,24 @@
+message SAMPLEONE {
+  /* Comment1 */
+  uint64 SampleID = 2;
+  /* Comment2 */
+  int64 Times = 3;
+  /* Comment3 */
+  string NameID = 4;
+  
+  message StructName {
+    /* Comment4 */
+    string RewardID = 1;
+    /* Comment5 */
+    uint32 Count = 2;
+    /* Comment6 */
+    float64 Weight = 3;
+  }
+  
+  repeated StructName structName = 5;
+}
+
+message SAMPLEONE_ARRAY {
+  repeated SAMPLEONE sAMPLEONE = 1;
+}
+
