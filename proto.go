@@ -2,6 +2,7 @@ package xlsx2pb
 
 import (
 	"bufio"
+	"crypto/md5"
 	"fmt"
 	"os"
 	"strings"
@@ -14,10 +15,13 @@ var (
 	curIndent string
 	outPrefix = "./proto/"
 	outSuffix = ".proto"
+	pkgName   = "xlsx2pb"
 )
 
 // GenProto genenate proto file content
-func (pr *ProtoRow) GenProto() {
+func (pr *ProtoSheet) GenProto() {
+	pr.AddPreHead()
+
 	// Head
 	pr.AddMessageHead(pr.Name)
 
@@ -37,14 +41,23 @@ func (pr *ProtoRow) GenProto() {
 	pr.AddMessageArray()
 }
 
+// Hash generate hash of proto content
+func (pr *ProtoSheet) Hash() {
+	hash := md5.New()
+	for _, line := range pr.outProto {
+		hash.Write([]byte(line))
+	}
+	pr.hash = hash.Sum(nil)
+}
+
 // IncreaseIndent increase indent
-func (pr *ProtoRow) IncreaseIndent() {
+func (pr *ProtoSheet) IncreaseIndent() {
 	pr.tabCount++
 	curIndent = strings.Repeat(INDENT, pr.tabCount)
 }
 
 // DecreaseIndent decrease indent
-func (pr *ProtoRow) DecreaseIndent() {
+func (pr *ProtoSheet) DecreaseIndent() {
 	if pr.tabCount > 0 {
 		pr.tabCount--
 	}
@@ -52,23 +65,40 @@ func (pr *ProtoRow) DecreaseIndent() {
 }
 
 // AddOneEmptyLine add an empty line
-func (pr *ProtoRow) AddOneEmptyLine() {
+func (pr *ProtoSheet) AddOneEmptyLine() {
 	pr.outProto = append(pr.outProto, fmt.Sprintf("%s", curIndent))
 }
 
+// AddPreHead add syntax and package info
+func (pr *ProtoSheet) AddPreHead() {
+	ver := 2
+	if pr.isProto3 {
+		ver = 3
+	}
+	pr.outProto = append(pr.outProto, fmt.Sprintf("syntax = \"proto%d\";", ver))
+	pr.outProto = append(pr.outProto, fmt.Sprintf("package %s;", pkgName))
+	pr.AddOneEmptyLine()
+}
+
 // AddMessageHead add a proto message head
-func (pr *ProtoRow) AddMessageHead(name string) {
+func (pr *ProtoSheet) AddMessageHead(name string) {
 	pr.outProto = append(pr.outProto, fmt.Sprintf("%smessage %s {", curIndent, name))
 	pr.IncreaseIndent()
 }
 
 // AddOneDefination add a proto defination
-func (pr *ProtoRow) AddOneDefination(isRepeat bool, comment, typ, name string, idx *int) {
+func (pr *ProtoSheet) AddOneDefination(isRepeat bool, comment, p2type, typ, name string, idx *int) {
 	if comment != "" {
 		pr.outProto = append(pr.outProto, fmt.Sprintf("%s/* %s */", curIndent, comment)) // comment
 	}
 	if name == "" {
-		name = firstLetter2Lowercase(typ)
+		name = firstLetter2Lowercase(typ) // struct use type name as name
+	}
+	if typ == "float" || typ == "float64" { // convert go varient name to proto varient name
+		typ = "double"
+	}
+	if !pr.isProto3 && p2type != "" { // only for proto2
+		typ = fmt.Sprintf("%s %s", p2type, typ)
 	}
 	if isRepeat {
 		typ = "repeated " + typ
@@ -78,20 +108,20 @@ func (pr *ProtoRow) AddOneDefination(isRepeat bool, comment, typ, name string, i
 }
 
 // AddMessageTail add a proto message tail
-func (pr *ProtoRow) AddMessageTail() {
+func (pr *ProtoSheet) AddMessageTail() {
 	pr.DecreaseIndent()
 	pr.outProto = append(pr.outProto, fmt.Sprintf("%s}", curIndent))
 	pr.AddOneEmptyLine()
 }
 
 // AddVal add a proto variable define
-func (pr *ProtoRow) AddVal(sh *Val) {
-	pr.AddOneDefination(false, sh.comment, sh.typ, sh.name, &pr.varIdx)
+func (pr *ProtoSheet) AddVal(sh *Val) {
+	pr.AddOneDefination(false, sh.comment, sh.proto2Type, sh.typ, sh.name, &pr.varIdx)
 	sh.fieldNum = pr.varIdx
 }
 
 // AddRepeat add repeat struct
-func (pr *ProtoRow) AddRepeat(repeat *Repeat) {
+func (pr *ProtoSheet) AddRepeat(repeat *Repeat) {
 	pr.AddOneEmptyLine()
 	// Add message head
 	pr.AddMessageHead(repeat.fieldName)
@@ -107,27 +137,27 @@ func (pr *ProtoRow) AddRepeat(repeat *Repeat) {
 }
 
 // AddRepeatDefine add repeat inner define
-func (pr *ProtoRow) AddRepeatDefine(repeat *Repeat) {
+func (pr *ProtoSheet) AddRepeatDefine(repeat *Repeat) {
 	for _, sh := range repeat.fields {
-		pr.AddOneDefination(false, sh.comment, sh.typ, sh.name, &repeat.repeatIdx)
+		pr.AddOneDefination(false, sh.comment, sh.proto2Type, sh.typ, sh.name, &repeat.repeatIdx)
 	}
 }
 
 // AddRepeatTail add repeat declare
-func (pr *ProtoRow) AddRepeatTail(repeat *Repeat) {
-	pr.AddOneDefination(true, repeat.comment, repeat.fieldName, repeat.comment, &pr.varIdx)
+func (pr *ProtoSheet) AddRepeatTail(repeat *Repeat) {
+	pr.AddOneDefination(true, repeat.comment, "", repeat.fieldName, repeat.comment, &pr.varIdx)
 	repeat.fieldNum = pr.varIdx
 }
 
 // AddMessageArray add an array for current message as XXX_ARRAY
-func (pr *ProtoRow) AddMessageArray() {
+func (pr *ProtoSheet) AddMessageArray() {
 	pr.AddMessageHead(pr.Name + "_ARRAY")
 	pr.outProto = append(pr.outProto, fmt.Sprintf("%srepeated %s %s = 1;", curIndent, pr.Name, firstLetter2Lowercase(pr.Name)))
 	pr.AddMessageTail()
 }
 
 // Write output proto file to "./proto/sheetname.proto"
-func (pr *ProtoRow) Write() {
+func (pr *ProtoSheet) Write() {
 	f, err := os.Create(outPrefix + strings.ToLower(pr.Name) + outSuffix)
 	defer f.Close()
 

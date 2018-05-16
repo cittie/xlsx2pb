@@ -22,13 +22,13 @@ func setup() {
 	testCacher.XlsxInfos[info.FileName] = info
 
 	// mock filename
-	preCacheFileName = cacheFileName
-	cacheFileName = "./cache/sheetcachetest.json"
+	preCacheFileName = sheetCache
+	sheetCache = "./cache/sheetcachetest.json"
 }
 
 func tearDown() {
-	os.Remove(cacheFileName)
-	cacheFileName = preCacheFileName
+	os.Remove(sheetCache)
+	sheetCache = preCacheFileName
 }
 
 func TestCacheReadAndWrite(t *testing.T) {
@@ -46,7 +46,7 @@ func TestCacheReadAndWrite(t *testing.T) {
 	// Clear
 	ClearCache()
 	assert.Equal(t, newCacher(), cacher)
-	_, err := os.Stat(cacheFileName)
+	_, err := os.Stat(sheetCache)
 	assert.Error(t, err)
 
 	tearDown()

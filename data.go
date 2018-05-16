@@ -9,8 +9,8 @@ import (
 	"github.com/tealeg/xlsx"
 )
 
-// ProtoRow is used to generate proto file
-type ProtoRow struct {
+// ProtoSheet is used to generate proto file
+type ProtoSheet struct {
 	ProtoIn
 	ProtoOut
 	buf *proto.Buffer
@@ -21,12 +21,14 @@ type ProtoIn struct {
 	Name    string
 	vars    []*Val
 	repeats []*Repeat
+	hash    []byte
 }
 
 // ProtoOut controls how to output proto file
 type ProtoOut struct {
 	varIdx   int
 	tabCount int
+	isProto3 bool
 	outProto []string
 }
 
@@ -49,11 +51,12 @@ const (
 
 // Val contains fields for .proto file
 type Val struct {
-	colIdx   int
-	typ      string
-	name     string
-	comment  string
-	fieldNum int
+	colIdx     int
+	proto2Type string
+	typ        string
+	name       string
+	comment    string
+	fieldNum   int
 }
 
 // Repeat contains repeat filed for .proto file
@@ -68,8 +71,8 @@ type Repeat struct {
 	fields      []*Val
 }
 
-func newProtoRow() *ProtoRow {
-	pr := new(ProtoRow)
+func newProtoRow() *ProtoSheet {
+	pr := new(ProtoSheet)
 	pr.varIdx = 1
 	pr.buf = proto.NewBuffer([]byte{})
 
@@ -84,7 +87,7 @@ func readSheet(sheet *xlsx.Sheet) error {
 	return nil
 }
 
-func readHeads(sheet *xlsx.Sheet) *ProtoRow {
+func readHeads(sheet *xlsx.Sheet) *ProtoSheet {
 	pr := newProtoRow()
 	pr.Name = sheet.Name
 	var repeatLength, repeatStructLength int // These are counters for repeat structure
@@ -99,18 +102,19 @@ func readHeads(sheet *xlsx.Sheet) *ProtoRow {
 
 		switch headType {
 		case Req, Opt:
-			head := new(Val)
-			head.colIdx = colIdx
-			head.typ = sheet.Cell(RowType, colIdx).Value
-			head.name = sheet.Cell(RowID, colIdx).Value
-			head.comment = sheet.Cell(RowComment, colIdx).Value
+			val := new(Val)
+			val.colIdx = colIdx
+			val.proto2Type = headType
+			val.typ = sheet.Cell(RowType, colIdx).Value
+			val.name = sheet.Cell(RowID, colIdx).Value
+			val.comment = sheet.Cell(RowComment, colIdx).Value
 
 			if repeatLength == 0 {
-				pr.vars = append(pr.vars, head)
+				pr.vars = append(pr.vars, val)
 			} else {
 				// read repeat struct but avoid duplicate
 				if len(curRepeat.fields) != curRepeat.fieldLength {
-					curRepeat.fields = append(curRepeat.fields, head)
+					curRepeat.fields = append(curRepeat.fields, val)
 				}
 				// check if repeat ends
 				repeatStructLength--
@@ -142,7 +146,7 @@ func readHeads(sheet *xlsx.Sheet) *ProtoRow {
 	return pr
 }
 
-func (pr *ProtoRow) readData(sheet *xlsx.Sheet) {
+func (pr *ProtoSheet) readData(sheet *xlsx.Sheet) {
 	// Add Tag
 	pr.buf.EncodeVarint(uint64(10)) // (1 << 3) | 2 = 10
 
@@ -167,7 +171,7 @@ func (rp *Repeat) getCount(row *xlsx.Row) int {
 }
 
 // readRow Marshal a row of data into binary data
-func (pr *ProtoRow) readRow(row *xlsx.Row) []byte {
+func (pr *ProtoSheet) readRow(row *xlsx.Row) []byte {
 	rowBuff := proto.NewBuffer([]byte{})
 	for _, val := range pr.vars {
 		readCell(rowBuff, val, row.Cells[val.colIdx]) // Variable part of data

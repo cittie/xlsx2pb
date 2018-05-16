@@ -1,0 +1,27 @@
+syntax = "proto2";
+package xlsx2pb;
+
+message SAMPLEONE {
+  /* Comment1 */
+  required uint64 SampleID = 2;
+  /* Comment2 */
+  optional int64 Times = 3;
+  /* Comment3 */
+  optional string NameID = 4;
+  
+  message StructName {
+    /* Comment4 */
+    optional string RewardID = 1;
+    /* Comment5 */
+    optional uint32 Count = 2;
+    /* Comment6 */
+    optional double Weight = 3;
+  }
+  
+  repeated StructName structName = 5;
+}
+
+message SAMPLEONE_ARRAY {
+  repeated SAMPLEONE sAMPLEONE = 1;
+}
+

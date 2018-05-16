@@ -42,15 +42,20 @@ func TestReadHeads(t *testing.T) {
 }
 
 func TestWriteProto(t *testing.T) {
-	pr := readHeads(testSheet)
-	pr.GenProto()
-	assert.Equal(t, len(pr.outProto), 24)
-
-	srcFile := "./test/sampleone.proto"
 	tarFile := "./proto/sampleone.proto"
 
+	pr := readHeads(testSheet)
+	pr.GenProto()
+	assert.Equal(t, len(pr.outProto), 27)
 	pr.Write()
-	assert.Equal(t, getFileMD5(srcFile), getFileMD5(tarFile))
+	assert.Equal(t, getFileMD5("./test/sampleone2.proto"), getFileMD5(tarFile))
+
+	pr = readHeads(testSheet)
+	pr.isProto3 = true
+	pr.GenProto()
+	pr.Write()
+	assert.Equal(t, getFileMD5("./test/sampleone3.proto"), getFileMD5(tarFile))
+
 	defer os.Remove(tarFile)
 }
 

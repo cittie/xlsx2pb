@@ -1,30 +1,33 @@
 package xlsx2pb
 
 import (
+	"encoding/hex"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
-func genTestProtoRow() *ProtoRow {
-	pr := new(ProtoRow)
+func genTestProtoRow() *ProtoSheet {
+	pr := new(ProtoSheet)
 
 	pr.Name = "TestProtoRow"
 
 	// Field
 	sh := &Val{
-		colIdx:  0,
-		typ:     "string",
-		name:    "TestField1",
-		comment: "* This is TestFiled1 *",
+		colIdx:     0,
+		proto2Type: "optional",
+		typ:        "string",
+		name:       "TestField1",
+		comment:    "* This is TestFiled1 *",
 	}
 
 	// Repeat Field
 	sh2 := &Val{
-		colIdx:  1,
-		typ:     "int64",
-		name:    "TestRepeat1",
-		comment: "** This is TestRepeat1 **",
+		colIdx:     1,
+		proto2Type: "optional",
+		typ:        "int64",
+		name:       "TestRepeat1",
+		comment:    "** This is TestRepeat1 **",
 	}
 
 	pr.vars = append(pr.vars, sh)
@@ -43,7 +46,7 @@ func genTestProtoRow() *ProtoRow {
 	return pr
 }
 
-func TestAddMessage(t *testing.T) {
+func TestAddMessageProto2(t *testing.T) {
 	pr := genTestProtoRow()
 	var idx int
 
@@ -51,6 +54,53 @@ func TestAddMessage(t *testing.T) {
 		assert.Equal(t, out, pr.outProto[idx])
 		idx++
 	}
+
+	pr.AddPreHead()
+	checkOutput("syntax = \"proto2\";")
+	checkOutput("package xlsx2pb;")
+	checkOutput("")
+
+	pr.AddMessageHead(pr.Name)
+	checkOutput("message TestProtoRow {")
+
+	pr.AddVal(pr.vars[0])
+	checkOutput("  /* * This is TestFiled1 * */")
+	checkOutput("  optional string TestField1 = 1;")
+
+	pr.AddRepeat(pr.repeats[0])
+	checkOutput("  ")
+	checkOutput("  message TestRepeatStruct {")
+	checkOutput("    /* ** This is TestRepeat1 ** */")
+	checkOutput("    optional int64 TestRepeat1 = 1;")
+	checkOutput("  }")
+	checkOutput("  ")
+	checkOutput("  repeated TestRepeatStruct testRepeatStruct = 2;")
+
+	pr.AddMessageTail()
+	checkOutput("}")
+	checkOutput("")
+
+	pr.AddMessageArray()
+	checkOutput("message TestProtoRow_ARRAY {")
+	checkOutput("  repeated TestProtoRow testProtoRow = 1;")
+	checkOutput("}")
+	checkOutput("")
+}
+
+func TestAddMessageProto3(t *testing.T) {
+	pr := genTestProtoRow()
+	pr.isProto3 = true
+	var idx int
+
+	checkOutput := func(out string) {
+		assert.Equal(t, out, pr.outProto[idx])
+		idx++
+	}
+
+	pr.AddPreHead()
+	checkOutput("syntax = \"proto3\";")
+	checkOutput("package xlsx2pb;")
+	checkOutput("")
 
 	pr.AddMessageHead(pr.Name)
 	checkOutput("message TestProtoRow {")
@@ -77,4 +127,12 @@ func TestAddMessage(t *testing.T) {
 	checkOutput("  repeated TestProtoRow testProtoRow = 1;")
 	checkOutput("}")
 	checkOutput("")
+}
+
+func TestHash(t *testing.T) {
+	pr := genTestProtoRow()
+	pr.GenProto()
+	pr.Hash()
+
+	assert.Equal(t, "ae5310163da78feec41ba78f243f7f87", hex.EncodeToString(pr.hash[:]))
 }

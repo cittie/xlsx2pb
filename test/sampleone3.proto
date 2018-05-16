@@ -1,3 +1,6 @@
+syntax = "proto3";
+package xlsx2pb;
+
 message SAMPLEONE {
   /* Comment1 */
   uint64 SampleID = 2;
@@ -12,7 +15,7 @@ message SAMPLEONE {
     /* Comment5 */
     uint32 Count = 2;
     /* Comment6 */
-    float64 Weight = 3;
+    double Weight = 3;
   }
   
   repeated StructName structName = 5;
