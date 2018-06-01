@@ -7,6 +7,16 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	"github.com/tealeg/xlsx"
+	"strings"
+	"bufio"
+	"path/filepath"
+)
+
+var (
+	dataOutPrefix = "./data/"
+	dataOutSuffix = ".data"
+	xlsxPrefix = "./xlsx/"
+	xlsxSuffix = ".xlsx"
 )
 
 // ProtoSheet is used to generate proto file
@@ -79,10 +89,44 @@ func newProtoRow() *ProtoSheet {
 	return pr
 }
 
+func ReadSheet(fileName, sheetName string) error {
+	xlsxFullName := filepath.Join(xlsxPrefix, fileName + xlsxSuffix)
+	if _, err := os.Stat(xlsxFullName); os.IsNotExist(err) {
+		return fmt.Errorf("file %s does not exists", fileName)
+	}
+
+	xlsxFile, err := xlsx.OpenFile(xlsxFullName)
+	if err != nil {
+		return err
+	}
+
+	xlsxSheet, ok := xlsxFile.Sheet[sheetName]
+	if ok {
+		readSheet(xlsxSheet)
+	}
+
+	return fmt.Errorf("xlsx file %s does not contain sheet %s", fileName, sheetName)
+}
+
 func readSheet(sheet *xlsx.Sheet) error {
 	if sheet.MaxRow < RowData {
 		return fmt.Errorf("Sheet contains no data")
 	}
+
+	// proto
+	pr := readHeads(sheet)
+	pr.GenProto()
+	pr.Hash()
+
+	// check if proto need update
+	if string(pr.hash) != string(cacher.ProtoInfos[pr.Name]) {
+		cacher.ProtoInfos[pr.Name] = pr.hash
+		pr.WriteProto()
+	}
+
+	// always write data if xlsx file changed
+	pr.readData(sheet)
+	pr.WriteData()
 
 	return nil
 }
@@ -234,4 +278,17 @@ func readCell(b *proto.Buffer, val *Val, cell *xlsx.Cell) {
 		fmt.Fprintf(os.Stderr, "invalid var type: %v\n", val.typ)
 		return
 	}
+}
+
+func (pr *ProtoSheet) WriteData() {
+	f, err := os.Create(dataOutPrefix + strings.ToLower(pr.Name) + dataOutSuffix)
+	defer f.Close()
+
+	if err != nil {
+		panic(err)
+	}
+
+	w := bufio.NewWriter(f)
+	w.Write(pr.buf.Bytes())
+	w.Flush()
 }

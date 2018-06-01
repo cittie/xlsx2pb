@@ -15,13 +15,13 @@ var (
 // Cacher is handler for cache
 type Cacher struct {
 	XlsxInfos  map[string]*XlsxInfo `json:"xlsxinfos"`
-	ProtoInfos map[string]string    `json:"protoinfos"`
+	ProtoInfos map[string][]byte  `json:"protoinfos"`
 }
 
 // XlsxInfo contains sheet information in xlsx files
 type XlsxInfo struct {
-	FileName string   `json:"filename"`
-	MD5      [16]byte `json:"md5"`
+	FileName string `json:"filename"`
+	MD5      []byte `json:"md5"`
 }
 
 // CacheInit initialize cacher and read from file
@@ -36,7 +36,7 @@ func CacheInit() {
 func newCacher() *Cacher {
 	cacher := new(Cacher)
 	cacher.XlsxInfos = make(map[string]*XlsxInfo)
-	cacher.ProtoInfos = make(map[string]string)
+	cacher.ProtoInfos = make(map[string][]byte)
 
 	return cacher
 }

@@ -11,11 +11,11 @@ import (
 
 var (
 	// INDENT Use 2 spaces
-	INDENT    = "  "
-	curIndent string
-	outPrefix = "./proto/"
-	outSuffix = ".proto"
-	pkgName   = "xlsx2pb"
+	INDENT         = "  "
+	curIndent      string
+	protoOutPrefix = "./proto/"
+	protoOutSuffix = ".proto"
+	pkgName        = "xlsx2pb"
 )
 
 // GenProto genenate proto file content
@@ -156,9 +156,9 @@ func (pr *ProtoSheet) AddMessageArray() {
 	pr.AddMessageTail()
 }
 
-// Write output proto file to "./proto/sheetname.proto"
-func (pr *ProtoSheet) Write() {
-	f, err := os.Create(outPrefix + strings.ToLower(pr.Name) + outSuffix)
+// WriteProto output proto file to "./proto/sheetname.proto"
+func (pr *ProtoSheet) WriteProto() {
+	f, err := os.Create(protoOutPrefix + strings.ToLower(pr.Name) + protoOutSuffix)
 	defer f.Close()
 
 	if err != nil {

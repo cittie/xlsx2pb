@@ -9,7 +9,7 @@ import (
 
 func TestGetFileMD5(t *testing.T) {
 	md5 := getFileMD5("./test/md5test")
-	assert.Equal(t, "f7ffd6e04e02a743fe8bec550e64cb71", hex.EncodeToString(md5[:]))
+	assert.Equal(t, "b11e08322cbeae46b006005067623264", hex.EncodeToString(md5))
 }
 
 func TestIsTitleValid(t *testing.T) {

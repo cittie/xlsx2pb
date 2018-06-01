@@ -5,17 +5,25 @@ import (
 )
 
 func main() {
-	if len(flag.Args()) != 2 {
-		panic("Source path and target path is needed!")
-	}
-
 	isCacheOn = *flag.Bool("cache", true, "Use cache to check if .proto file needs to update")
 
 	if isCacheOn {
 		CacheInit()
 	}
 
-	if isCacheOn {
+	for filename, sheets := range sheetFileMap {
+		if IsXlsxChanged(filename) {
+			for _, sheet := range sheets {
+				err := ReadSheet(filename, sheet)
+				if err != nil {
+					// panic or continue as needed.
+					panic(err)
+				}
+			}
+		}
+	}
 
+	if isCacheOn {
+		cacher.Save()
 	}
 }

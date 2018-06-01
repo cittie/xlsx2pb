@@ -18,9 +18,11 @@
 
 `SHEETNAME1,SHEETNAME2,SHEETNAME3 XLSXFILENAME1.xlsx`
 
-然后运行如下命令:
+然后运行xlsx2pb
 
-`xlsx2pb xlsx_input_path proto_output_path`
+- proto文件会输出到proto目录
+- 二进制文件会输出到data目录
+- 日志会输出到log目录
 
 ## 参数
 

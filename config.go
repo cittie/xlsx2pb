@@ -18,6 +18,11 @@ var (
 
 func init() {
 	ResetConfigCache()
+
+	for _, cfg := range getConfigFiles("./xlsx") {
+		fmt.Printf("Config file %s found\n", cfg)
+		readCfgFile(cfg)
+	}
 }
 
 // ResetConfigCache clear current config data

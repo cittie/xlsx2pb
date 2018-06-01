@@ -18,9 +18,10 @@ If sheets have the same structure, it can be written as following:
 
 `SHEETNAME1,SHEETNAME2,SHEETNAME3 XLSXFILENAME1.xlsx`
 
-Then run the command:
+Then run the xlsx2pb
 
-`xlsx2pb xlsx_input_path proto_output_path`
+- Proto files and binary files will be generated in folder 'proto' and 'data'
+- Log file will be generated in folder 'log' 
 
 ## Params
 
