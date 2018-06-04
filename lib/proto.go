@@ -169,6 +169,10 @@ func (pr *ProtoSheet) WriteProto() {
 	}
 
 	w.Flush()
+
+	if err := f.Close(); err != nil {
+		fmt.Println(err.Error())
+	}
 }
 
 func firstLetter2Lowercase(title string) string {

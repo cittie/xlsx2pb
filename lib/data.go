@@ -114,8 +114,10 @@ func readSheet(sheet *xlsx.Sheet) error {
 	pr.Hash()
 
 	// check if proto need update
-	if string(pr.hash) != string(cacher.ProtoInfos[pr.Name]) {
-		cacher.ProtoInfos[pr.Name] = pr.hash
+	if !isCacheOn || string(pr.hash) != string(cacher.ProtoInfos[pr.Name]) {
+		if isCacheOn {
+			cacher.ProtoInfos[pr.Name] = pr.hash
+		}
 		pr.WriteProto()
 	}
 
@@ -286,4 +288,8 @@ func (pr *ProtoSheet) WriteData() {
 	w := bufio.NewWriter(f)
 	w.Write(pr.buf.Bytes())
 	w.Flush()
+
+	if err := f.Close(); err != nil {
+		fmt.Println(err.Error())
+	}
 }

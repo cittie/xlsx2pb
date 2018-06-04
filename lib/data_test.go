@@ -11,6 +11,9 @@ import (
 
 var (
 	testSheet *xlsx.Sheet
+	xlsxPath string
+	protoPath string
+	dataPath string
 )
 
 func init() {
@@ -22,6 +25,21 @@ func init() {
 	if testSheet = xf.Sheet["SAMPLEONE"]; testSheet == nil {
 		panic("Unable to find test sheet!")
 	}
+}
+
+func MockUp() {
+	xlsxPath = cfg.XlsxPath
+	cfg.XlsxPath = "../test/"
+	protoPath = cfg.ProtoOutPath
+	cfg.ProtoOutPath = "../test/"
+	dataPath = cfg.DataOutPath
+	cfg.DataOutPath = "../test/"
+}
+
+func TearDown() {
+	cfg.XlsxPath = xlsxPath
+	cfg.ProtoOutPath = protoPath
+	cfg.DataOutPath = dataPath
 }
 
 func TestReadHeads(t *testing.T) {
@@ -93,4 +111,27 @@ func TestReadData(t *testing.T) {
 	pr.readData(testSheet)
 
 	assert.Equal(t, 247, len(pr.buf.Bytes()))
+}
+
+func TestReadSheet(t *testing.T) {
+	MockUp()
+
+	rmTmp := func () {
+		for _, tmp := range []string {"../test/sampleone.data", "../test/sampleone.proto"} {
+			if _, err := os.Stat(tmp); err == nil {
+				os.Remove(tmp)
+			}
+		}
+	}
+
+	err := ReadSheet("Sample.xlsx", "SAMPLEONE")
+	assert.Nil(t, err)
+
+	isCacheOn = true
+	err = ReadSheet("Sample.xlsx", "SAMPLEONE")
+	assert.Nil(t, err)
+
+	rmTmp()
+
+	TearDown()
 }
