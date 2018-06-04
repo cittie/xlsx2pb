@@ -101,7 +101,8 @@ func readCfgLine(cfgLine string) error {
 	sheets := strings.Split(parts[0], ",")
 	for _, sheet := range sheets {
 		if _, ok := sheetNames[sheet]; ok {
-			return fmt.Errorf("%s name duplicates\n", sheet)
+			//return fmt.Errorf("%s name duplicates\n", sheet)
+			fmt.Printf("Duplicate sheet name %s found", sheet) // Enable duplicate sheet names
 		}
 
 		sheetNames[sheet] = struct{}{}
