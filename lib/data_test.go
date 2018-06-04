@@ -1,4 +1,4 @@
-package xlsx2pb
+package lib
 
 import (
 	"os"
@@ -14,7 +14,7 @@ var (
 )
 
 func init() {
-	xf, err := xlsx.OpenFile("./test/Sample.xlsx")
+	xf, err := xlsx.OpenFile("../test/Sample.xlsx")
 	if err != nil {
 		panic(err)
 	}
@@ -42,19 +42,19 @@ func TestReadHeads(t *testing.T) {
 }
 
 func TestWriteProto(t *testing.T) {
-	tarFile := "./proto/sampleone.proto"
+	tarFile := "../proto/sampleone.proto"
 
 	pr := readHeads(testSheet)
 	pr.GenProto()
 	assert.Equal(t, len(pr.outProto), 27)
 	pr.WriteProto()
-	assert.Equal(t, getFileMD5("./test/sampleone2.proto"), getFileMD5(tarFile))
+	assert.Equal(t, getFileMD5("../test/sampleone2.proto"), getFileMD5(tarFile))
 
 	pr = readHeads(testSheet)
 	pr.isProto3 = true
 	pr.GenProto()
 	pr.WriteProto()
-	assert.Equal(t, getFileMD5("./test/sampleone3.proto"), getFileMD5(tarFile))
+	assert.Equal(t, getFileMD5("../test/sampleone3.proto"), getFileMD5(tarFile))
 
 	defer os.Remove(tarFile)
 }

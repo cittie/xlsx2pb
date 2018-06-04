@@ -1,21 +1,19 @@
-package xlsx2pb
+package lib
 
 import (
 	"bufio"
 	"crypto/md5"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"unicode"
 )
 
 var (
 	// INDENT Use 2 spaces
-	INDENT         = "  "
-	curIndent      string
-	protoOutPrefix = "./proto/"
-	protoOutSuffix = ".proto"
-	pkgName        = "xlsx2pb"
+	INDENT    = "  "
+	curIndent string
 )
 
 // GenProto genenate proto file content
@@ -76,7 +74,7 @@ func (pr *ProtoSheet) AddPreHead() {
 		ver = 3
 	}
 	pr.outProto = append(pr.outProto, fmt.Sprintf("syntax = \"proto%d\";", ver))
-	pr.outProto = append(pr.outProto, fmt.Sprintf("package %s;", pkgName))
+	pr.outProto = append(pr.outProto, fmt.Sprintf("package %s;", cfg.PackageName))
 	pr.AddOneEmptyLine()
 }
 
@@ -158,7 +156,7 @@ func (pr *ProtoSheet) AddMessageArray() {
 
 // WriteProto output proto file to "./proto/sheetname.proto"
 func (pr *ProtoSheet) WriteProto() {
-	f, err := os.Create(protoOutPrefix + strings.ToLower(pr.Name) + protoOutSuffix)
+	f, err := os.Create(filepath.Join(cfg.ProtoOutPath, strings.ToLower(pr.Name)+cfg.ProtoOutExt))
 	defer f.Close()
 
 	if err != nil {

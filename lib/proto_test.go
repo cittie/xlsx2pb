@@ -1,4 +1,4 @@
-package xlsx2pb
+package lib
 
 import (
 	"encoding/hex"

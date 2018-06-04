@@ -1,4 +1,4 @@
-package xlsx2pb
+package lib
 
 import (
 	"os"
@@ -22,13 +22,13 @@ func setup() {
 	testCacher.XlsxInfos[info.FileName] = info
 
 	// mock filename
-	preCacheFileName = sheetCache
-	sheetCache = "./cache/sheetcachetest.json"
+	preCacheFileName = cfg.CacheFile
+	cfg.CacheFile = "../cache/sheetcachetest.json"
 }
 
 func tearDown() {
-	os.Remove(sheetCache)
-	sheetCache = preCacheFileName
+	os.Remove(cfg.CacheFile)
+	cfg.CacheFile = preCacheFileName
 }
 
 func TestCacheReadAndWrite(t *testing.T) {
@@ -46,7 +46,7 @@ func TestCacheReadAndWrite(t *testing.T) {
 	// Clear
 	ClearCache()
 	assert.Equal(t, newCacher(), cacher)
-	_, err := os.Stat(sheetCache)
+	_, err := os.Stat(cfg.CacheFile)
 	assert.Error(t, err)
 
 	tearDown()

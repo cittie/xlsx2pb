@@ -1,0 +1,25 @@
+[Config]
+# Avoid using "~" or "$GOPATH" in path
+# "." or ".." is acceptable but may cause problems
+xlsx_path = "/Users/jiangyi/go/src/github.com/cittie/xlsx2pb/xlsx/"
+
+# Regular Expression of config files
+config_reg_exp = "xlsx*.config"
+
+xlsx_ext = ""
+
+# use proto 2 or proto 3
+use_proto3 = false
+
+# proto package name
+package_name = "xlsx2pb"
+
+proto_path = "/Users/jiangyi/go/src/github.com/cittie/xlsx2pb/proto/"
+
+proto_ext = ".proto"
+
+data_path = "/Users/jiangyi/go/src/github.com/cittie/xlsx2pb/data/"
+
+data_ext = ".data"
+
+cache_file = "/Users/jiangyi/go/src/github.com/cittie/xlsx2pb/cache/cache.json"

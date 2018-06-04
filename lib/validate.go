@@ -1,12 +1,12 @@
-package xlsx2pb
+package lib
 
 import (
 	"crypto/md5"
 	"io"
 	"log"
 	"os"
-	"strings"
 	"path/filepath"
+	"strings"
 )
 
 func getFileMD5(path string) []byte {
@@ -46,7 +46,7 @@ func IsXlsxChanged(filename string) bool {
 		}
 		cacher.XlsxInfos[filename] = &XlsxInfo{
 			FileName: filename,
-			MD5: getFileMD5(fname),
+			MD5:      getFileMD5(fname),
 		}
 	}
 
@@ -55,7 +55,7 @@ func IsXlsxChanged(filename string) bool {
 
 // IsSheetExists check if file exist in xlsx folder
 func IsSheetExists(xlsxName string) bool {
-	xlsxFullName := filepath.Join(xlsxPrefix, xlsxName + xlsxSuffix)
+	xlsxFullName := filepath.Join(cfg.XlsxPath, xlsxName+cfg.XlsxExt)
 	if _, err := os.Stat(xlsxFullName); err == nil {
 		return true
 	}

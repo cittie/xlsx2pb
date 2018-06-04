@@ -1,4 +1,4 @@
-package xlsx2pb
+package lib
 
 import (
 	"encoding/json"
@@ -7,15 +7,14 @@ import (
 )
 
 var (
-	isCacheOn  bool
-	sheetCache = "./cache/sheetcache.json"
-	cacher     *Cacher
+	isCacheOn bool
+	cacher    *Cacher
 )
 
 // Cacher is handler for cache
 type Cacher struct {
 	XlsxInfos  map[string]*XlsxInfo `json:"xlsxinfos"`
-	ProtoInfos map[string][]byte  `json:"protoinfos"`
+	ProtoInfos map[string][]byte    `json:"protoinfos"`
 }
 
 // XlsxInfo contains sheet information in xlsx files
@@ -28,7 +27,7 @@ type XlsxInfo struct {
 func CacheInit() {
 	cacher = newCacher()
 
-	if _, err := os.Stat(sheetCache); err == nil {
+	if _, err := os.Stat(cfg.CacheFile); err == nil {
 		cacher.Load()
 	}
 }
@@ -43,7 +42,7 @@ func newCacher() *Cacher {
 
 // Load read data from json cache file
 func (c *Cacher) Load() error {
-	rawData, err := ioutil.ReadFile(sheetCache)
+	rawData, err := ioutil.ReadFile(cfg.CacheFile)
 	if err != nil {
 		return err
 	}
@@ -63,7 +62,7 @@ func (c *Cacher) Save() error {
 		return err
 	}
 
-	err = ioutil.WriteFile(sheetCache, rawData, 0644)
+	err = ioutil.WriteFile(cfg.CacheFile, rawData, 0644)
 	if err != nil {
 		return err
 	}
@@ -73,8 +72,8 @@ func (c *Cacher) Save() error {
 
 // ClearCache remove saved records and initialize a new cacher
 func ClearCache() {
-	if _, err := os.Stat(sheetCache); err == nil {
-		os.Remove(sheetCache)
+	if _, err := os.Stat(cfg.CacheFile); err == nil {
+		os.Remove(cfg.CacheFile)
 	}
 
 	cacher = newCacher()

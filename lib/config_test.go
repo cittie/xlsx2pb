@@ -1,4 +1,4 @@
-package xlsx2pb
+package lib
 
 import (
 	"testing"
@@ -7,7 +7,7 @@ import (
 )
 
 func TestGetConfigFiles(t *testing.T) {
-	path := "./test"
+	path := "../test"
 	files := getConfigFiles(path)
 
 	assert.Equal(t, 3, len(files))
@@ -19,13 +19,13 @@ func TestGetConfigFiles(t *testing.T) {
 func TestReadCfgFile(t *testing.T) {
 	ResetConfigCache()
 
-	file1 := "./test/xlsx_sample.config"
+	file1 := "../test/xlsx_sample.config"
 
 	readCfgFile(file1)
 	assert.Equal(t, 4, len(sheetNames))
 
 	// panic if config files contains incorrect lines
-	file2 := "./test/xlsx_sample_wrong.config"
+	file2 := "../test/xlsx_sample_wrong.config"
 	assert.Panics(t, func() { readCfgFile(file2) })
 }
 

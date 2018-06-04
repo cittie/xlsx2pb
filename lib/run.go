@@ -1,12 +1,7 @@
-package xlsx2pb
+package lib
 
-import (
-	"flag"
-)
-
-func main() {
-	isCacheOn = *flag.Bool("cache", true, "Use cache to check if .proto file needs to update")
-
+// Run execute the xlsx2pb and output proto files and binary data files
+func Run(isCacheOn bool) {
 	if isCacheOn {
 		CacheInit()
 	}

@@ -1,4 +1,4 @@
-package xlsx2pb
+package lib
 
 import (
 	"encoding/hex"
@@ -8,7 +8,7 @@ import (
 )
 
 func TestGetFileMD5(t *testing.T) {
-	md5 := getFileMD5("./test/md5test")
+	md5 := getFileMD5("../test/md5test")
 	assert.Equal(t, "b11e08322cbeae46b006005067623264", hex.EncodeToString(md5))
 }
 

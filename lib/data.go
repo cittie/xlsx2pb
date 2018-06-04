@@ -1,22 +1,15 @@
-package xlsx2pb
+package lib
 
 import (
+	"bufio"
 	"fmt"
 	"math"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/tealeg/xlsx"
-	"strings"
-	"bufio"
-	"path/filepath"
-)
-
-var (
-	dataOutPrefix = "./data/"
-	dataOutSuffix = ".data"
-	xlsxPrefix = "./xlsx/"
-	xlsxSuffix = ".xlsx"
 )
 
 // ProtoSheet is used to generate proto file
@@ -83,6 +76,7 @@ type Repeat struct {
 
 func newProtoRow() *ProtoSheet {
 	pr := new(ProtoSheet)
+	pr.isProto3 = cfg.UseProto3
 	pr.varIdx = 1
 	pr.buf = proto.NewBuffer([]byte{})
 
@@ -90,7 +84,7 @@ func newProtoRow() *ProtoSheet {
 }
 
 func ReadSheet(fileName, sheetName string) error {
-	xlsxFullName := filepath.Join(xlsxPrefix, fileName + xlsxSuffix)
+	xlsxFullName := filepath.Join(cfg.XlsxPath, fileName+cfg.XlsxExt)
 	if _, err := os.Stat(xlsxFullName); os.IsNotExist(err) {
 		return fmt.Errorf("file %s does not exists", fileName)
 	}
@@ -101,11 +95,12 @@ func ReadSheet(fileName, sheetName string) error {
 	}
 
 	xlsxSheet, ok := xlsxFile.Sheet[sheetName]
-	if ok {
-		readSheet(xlsxSheet)
+	if !ok {
+		return fmt.Errorf("xlsx file %s does not contain sheet %s", fileName, sheetName)
 	}
 
-	return fmt.Errorf("xlsx file %s does not contain sheet %s", fileName, sheetName)
+	readSheet(xlsxSheet)
+	return nil
 }
 
 func readSheet(sheet *xlsx.Sheet) error {
@@ -281,7 +276,7 @@ func readCell(b *proto.Buffer, val *Val, cell *xlsx.Cell) {
 }
 
 func (pr *ProtoSheet) WriteData() {
-	f, err := os.Create(dataOutPrefix + strings.ToLower(pr.Name) + dataOutSuffix)
+	f, err := os.Create(filepath.Join(cfg.DataOutPath, strings.ToLower(pr.Name)+cfg.DataOutExt))
 	defer f.Close()
 
 	if err != nil {
