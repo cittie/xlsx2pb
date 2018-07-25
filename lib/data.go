@@ -60,6 +60,7 @@ type Val struct {
 	name       string
 	comment    string
 	fieldNum   int
+	defaultValueStr string
 }
 
 // Repeat contains repeat filed for .proto file
@@ -72,6 +73,7 @@ type Repeat struct {
 	repeatIdx   int
 	comment     string
 	fields      []*Val
+	defaultValueStr string
 }
 
 func newProtoRow() *ProtoSheet {
@@ -148,6 +150,11 @@ func readHeads(sheet *xlsx.Sheet) *ProtoSheet {
 			val.proto2Type = headType
 			val.typ = sheet.Cell(RowType, colIdx).Value
 			val.name = sheet.Cell(RowID, colIdx).Value
+			// If val name has default value
+			if strings.Contains(val.name, "=") {
+				parts := strings.Split(val.name, "=")
+				val.name, val.defaultValueStr = parts[0], parts[1]
+			}
 			val.comment = sheet.Cell(RowComment, colIdx).Value
 
 			if repeatLength == 0 {
@@ -214,8 +221,12 @@ func (rp *Repeat) getCount(row *xlsx.Row) int {
 // readRow Marshal a row of data into binary data
 func (pr *ProtoSheet) readRow(row *xlsx.Row) []byte {
 	rowBuff := proto.NewBuffer([]byte{})
-	for _, val := range pr.vars {
-		readCell(rowBuff, val, row.Cells[val.colIdx]) // Variable part of data
+	for i, val := range pr.vars {
+		if i < len(row.Cells) {
+			readCell(rowBuff, val, row.Cells[val.colIdx]) // Variable part of data
+		} else {
+			readCell(rowBuff, val, new(xlsx.Cell))
+		}
 	}
 
 	for _, repeat := range pr.repeats {
@@ -241,6 +252,14 @@ func (pr *ProtoSheet) readRow(row *xlsx.Row) []byte {
 func readCell(b *proto.Buffer, val *Val, cell *xlsx.Cell) {
 	tag := func(wireType int) {
 		b.EncodeVarint(uint64((val.fieldNum << 3) | wireType))
+	}
+
+	// if val has default value and cell is blank, use default value instead
+	if cell.Value == "" {
+		if val.defaultValueStr == "" {
+			return
+		}
+		cell.SetValue(val.defaultValueStr)
 	}
 
 	switch val.typ {

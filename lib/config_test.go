@@ -26,7 +26,7 @@ func TestReadCfgFile(t *testing.T) {
 
 	// panic if config files contains incorrect lines
 	file2 := "../test/xlsx_sample_wrong.config"
-	assert.Panics(t, func() { readCfgFile(file2) })
+	assert.NotPanics(t, func() { readCfgFile(file2) })
 }
 
 func TestReadCfgLine(t *testing.T) {
@@ -39,7 +39,7 @@ func TestReadCfgLine(t *testing.T) {
 		{"SAMPLEONE Sample.xlsx", false},
 		{"SAMPLETHREE,SAMPLEFOUR Sample.xlsx", false},
 		{" SAMPLETWO Sample.xlsx ", false},
-		{"SAMPLEONE  Sample.xlsx", true}, // Duplicate
+		{"SAMPLEONE  Sample.xlsx", false}, // Duplicate
 		{"SAMPLEONE", true},
 		{"SAMPLEONE SAMPLETWO Sample.xlsx", true},
 	}

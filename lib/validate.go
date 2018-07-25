@@ -39,7 +39,7 @@ func IsXlsxChanged(filename string) bool {
 		return true
 	}
 
-	fname := filepath.Join("./xlsx", filename, ".xlsx")
+	fname := filepath.Join(cfg.XlsxPath, filename + cfg.XlsxExt)
 	if fInfo, ok := cacher.XlsxInfos[filename]; ok {
 		if string(getFileMD5(fname)) == string(fInfo.MD5) {
 			return false

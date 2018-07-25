@@ -30,3 +30,10 @@ func TestIsTitleValid(t *testing.T) {
 		assert.Equal(t, test.result, IsTitleValid(test.in))
 	}
 }
+
+func TestIsXlsxChanged(t *testing.T) {
+	isCacheOn = false
+	assert.True(t, IsXlsxChanged("WhatEver"))
+
+	isCacheOn = true
+}
