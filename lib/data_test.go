@@ -43,7 +43,8 @@ func TearDown() {
 }
 
 func TestReadHeads(t *testing.T) {
-	pr := readHeads(testSheet)
+	pr := newProtoRow()
+	pr.updateHeads(testSheet)
 
 	assert.Equal(t, 3, len(pr.vars))
 	assert.Equal(t, "uint64", pr.vars[0].typ)
@@ -62,19 +63,21 @@ func TestReadHeads(t *testing.T) {
 func TestWriteProto(t *testing.T) {
 	tarFile := "../proto/sampleone.proto"
 
-	pr := readHeads(testSheet)
+	pr := newProtoRow()
+	pr.updateHeads(testSheet)
 	pr.GenProto()
 	assert.Equal(t, len(pr.outProto), 27)
 	pr.WriteProto()
 	assert.Equal(t, getFileMD5("../test/sampleone2.proto"), getFileMD5(tarFile))
 
-	pr = readHeads(testSheet)
+	pr = newProtoRow()
+	pr.updateHeads(testSheet)
 	pr.isProto3 = true
 	pr.GenProto()
 	pr.WriteProto()
 	assert.Equal(t, getFileMD5("../test/sampleone3.proto"), getFileMD5(tarFile))
 
-	defer os.Remove(tarFile)
+	//defer os.Remove(tarFile)
 }
 
 func TestReadCell(t *testing.T) {
@@ -107,7 +110,8 @@ func TestReadCell(t *testing.T) {
 }
 
 func TestReadData(t *testing.T) {
-	pr := readHeads(testSheet)
+	pr := newProtoRow()
+	pr.updateHeads(testSheet)
 	pr.readData(testSheet)
 
 	assert.Equal(t, 247, len(pr.buf.Bytes()))

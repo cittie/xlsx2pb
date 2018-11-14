@@ -3,11 +3,11 @@ package xlsx2pb;
 
 message SAMPLEONE {
   /* Comment1 */
-  required uint64 SampleID = 2;
+  required uint64 SampleID = 1;
   /* Comment2 */
-  optional int64 Times = 3;
+  optional int64 Times = 2;
   /* Comment3 */
-  optional string NameID = 4;
+  optional string NameID = 3;
   
   message StructName {
     /* Comment4 */
@@ -18,10 +18,10 @@ message SAMPLEONE {
     optional double Weight = 3;
   }
   
-  repeated StructName structName = 5;
+  repeated StructName structnames = 4;
 }
 
 message SAMPLEONE_ARRAY {
-  repeated SAMPLEONE sAMPLEONE = 1;
+  repeated SAMPLEONE sampleones = 1;
 }
 

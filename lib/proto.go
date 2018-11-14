@@ -7,13 +7,13 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"unicode"
 )
 
 var (
 	// INDENT Use 2 spaces
 	INDENT    = "  "
 	curIndent string
+	defaultStructureName = "Default"
 )
 
 // GenProto genenate proto file content
@@ -84,13 +84,16 @@ func (pr *ProtoSheet) AddMessageHead(name string) {
 	pr.IncreaseIndent()
 }
 
-// AddOneDefination add a proto defination
-func (pr *ProtoSheet) AddOneDefination(isRepeat bool, comment, p2type, typ, name string, idx *int) {
+// AddOneDefine add a proto defination
+func (pr *ProtoSheet) AddOneDefine(isRepeat bool, comment, p2type, typ, name string, idx *int) {
 	if comment != "" {
 		pr.outProto = append(pr.outProto, fmt.Sprintf("%s/* %s */", curIndent, comment)) // comment
 	}
 	if name == "" {
-		name = firstLetter2Lowercase(typ) // struct use type name as name
+		name = title2Lowercase(strings.TrimSpace(typ)) // struct use type name as name
+		if name == "" { // if name is still missing, use a default name
+			name = defaultStructureName
+		}
 	}
 	if typ == "float" || typ == "float64" { // convert go varient name to proto varient name
 		typ = "double"
@@ -101,7 +104,7 @@ func (pr *ProtoSheet) AddOneDefination(isRepeat bool, comment, p2type, typ, name
 	if isRepeat {
 		typ = "repeated " + typ
 	}
-	pr.outProto = append(pr.outProto, fmt.Sprintf("%s%s %s = %d;", curIndent, typ, name, *idx+1)) // define
+	pr.outProto = append(pr.outProto, fmt.Sprintf("%s%s %s = %d;", curIndent, typ, name, *idx)) // define
 	*idx++
 }
 
@@ -114,7 +117,7 @@ func (pr *ProtoSheet) AddMessageTail() {
 
 // AddVal add a proto variable define
 func (pr *ProtoSheet) AddVal(sh *Val) {
-	pr.AddOneDefination(false, sh.comment, sh.proto2Type, sh.typ, sh.name, &pr.varIdx)
+	pr.AddOneDefine(false, sh.comment, sh.proto2Type, sh.typ, sh.name, &pr.varIdx)
 	sh.fieldNum = pr.varIdx
 }
 
@@ -137,20 +140,20 @@ func (pr *ProtoSheet) AddRepeat(repeat *Repeat) {
 // AddRepeatDefine add repeat inner define
 func (pr *ProtoSheet) AddRepeatDefine(repeat *Repeat) {
 	for _, sh := range repeat.fields {
-		pr.AddOneDefination(false, sh.comment, sh.proto2Type, sh.typ, sh.name, &repeat.repeatIdx)
+		pr.AddOneDefine(false, sh.comment, sh.proto2Type, sh.typ, sh.name, &repeat.repeatIdx)
 	}
 }
 
 // AddRepeatTail add repeat declare
 func (pr *ProtoSheet) AddRepeatTail(repeat *Repeat) {
-	pr.AddOneDefination(true, repeat.comment, "", repeat.fieldName, repeat.comment, &pr.varIdx)
+	pr.AddOneDefine(true, repeat.comment, "", repeat.fieldName, repeat.comment, &pr.varIdx)
 	repeat.fieldNum = pr.varIdx
 }
 
 // AddMessageArray add an array for current message as XXX_ARRAY
 func (pr *ProtoSheet) AddMessageArray() {
 	pr.AddMessageHead(pr.Name + "_ARRAY")
-	pr.outProto = append(pr.outProto, fmt.Sprintf("%srepeated %s %s = 1;", curIndent, pr.Name, firstLetter2Lowercase(pr.Name)))
+	pr.outProto = append(pr.outProto, fmt.Sprintf("%srepeated %s %s = 1;", curIndent, pr.Name, title2Lowercase(pr.Name)))
 	pr.AddMessageTail()
 }
 
@@ -175,8 +178,10 @@ func (pr *ProtoSheet) WriteProto() {
 	}
 }
 
-func firstLetter2Lowercase(title string) string {
-	runes := []rune(title)
-	runes[0] = unicode.ToLower(runes[0])
-	return string(runes)
+func title2Lowercase(title string) string {
+	if title == "" {
+		return ""
+	}
+
+	return strings.ToLower(title) + "s"
 }

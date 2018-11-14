@@ -25,6 +25,7 @@ type ProtoIn struct {
 	vars    []*Val
 	repeats []*Repeat
 	hash    []byte
+	fieldMap map[string]int  // map[fieldName]index in vars/repeats
 }
 
 // ProtoOut controls how to output proto file
@@ -78,11 +79,19 @@ type Repeat struct {
 
 func newProtoRow() *ProtoSheet {
 	pr := new(ProtoSheet)
+	pr.fieldMap = make(map[string]int)
 	pr.isProto3 = cfg.UseProto3
 	pr.varIdx = 1
 	pr.buf = proto.NewBuffer([]byte{})
 
 	return pr
+}
+
+func newRepeat() *Repeat {
+	rp := new(Repeat)
+	rp.repeatIdx = 1
+
+	return rp
 }
 
 func ReadSheet(fileName, sheetName string) error {
@@ -96,26 +105,40 @@ func ReadSheet(fileName, sheetName string) error {
 		return err
 	}
 
-	xlsxSheet, ok := xlsxFile.Sheet[sheetName]
-	if !ok {
-		return fmt.Errorf("xlsx file %s does not contain sheet %s", fileName, sheetName)
-	}
+	sheetNames := strings.Split(sheetName, ",")
+	sheets := make([]*xlsx.Sheet, 0)
+	for _, sheetName := range sheetNames {
+		xlsxSheet, ok := xlsxFile.Sheet[sheetName]
+		if !ok {
+			return fmt.Errorf("xlsx file %s does not contain sheet %s", fileName, sheetName)
+		}
 
-	readSheet(xlsxSheet)
+		sheets = append(sheets, xlsxSheet)
+	}
+	readSheets(fileName, sheets)
 	return nil
 }
 
-func readSheet(sheet *xlsx.Sheet) error {
-	if sheet.MaxRow < RowData {
-		return fmt.Errorf("Sheet contains no data")
+func readSheets(filename string, sheets []*xlsx.Sheet) error {
+	pr := newProtoRow()
+	for _, sheet := range sheets {
+		if sheet.MaxRow < RowData {
+			return fmt.Errorf("sheet %v contains no data", sheet)
+		}
+
+		// update head for each sheet, avoiding empty columns changes the col index
+		pr.updateHeads(sheet)
+		pr.readData(sheet)
 	}
 
-	// proto
-	pr := readHeads(sheet)
-	pr.GenProto()
-	pr.Hash()
+	// use filename instead of sheet name if sheets are more than 1
+	if len(sheets) > 1 {
+		pr.Name = strings.TrimSpace(strings.TrimSuffix(filename, ".xlsx"))
+	}
 
 	// check if proto need update
+	pr.GenProto()
+	pr.Hash()
 	if !isCacheOn || string(pr.hash) != string(cacher.ProtoInfos[pr.Name]) {
 		if isCacheOn {
 			cacher.ProtoInfos[pr.Name] = pr.hash
@@ -124,17 +147,23 @@ func readSheet(sheet *xlsx.Sheet) error {
 	}
 
 	// always write data if xlsx file changed
-	pr.readData(sheet)
-	pr.WriteData()
+	if pr != nil {
+		pr.WriteData()
+	}
+
+	// fmt.Printf("Done for %v ...\n", pr.Name)
 
 	return nil
 }
 
-func readHeads(sheet *xlsx.Sheet) *ProtoSheet {
-	pr := newProtoRow()
-	pr.Name = sheet.Name
+func (pr *ProtoSheet)updateHeads(sheet *xlsx.Sheet) {
+	pr.Name = strings.TrimSpace(sheet.Name)
+	pr.resetAllIndex()  // clear previous sheet data
+
 	var repeatLength, repeatStructLength int // These are counters for repeat structure
 	var curRepeat *Repeat
+
+	// fmt.Printf("readHeads for %v ...\n", pr.Name)
 
 	for colIdx := 0; colIdx < sheet.MaxCol; colIdx++ {
 		headType := sheet.Cell(0, colIdx).Value
@@ -158,7 +187,7 @@ func readHeads(sheet *xlsx.Sheet) *ProtoSheet {
 			val.comment = sheet.Cell(RowComment, colIdx).Value
 
 			if repeatLength == 0 {
-				pr.vars = append(pr.vars, val)
+				pr.updateVal(val)
 			} else {
 				// read repeat struct but avoid duplicate
 				if len(curRepeat.fields) != curRepeat.fieldLength {
@@ -171,27 +200,76 @@ func readHeads(sheet *xlsx.Sheet) *ProtoSheet {
 				}
 			}
 		case Rep:
-			rp := new(Repeat)
+			rp := newRepeat()
 			rp.colIdx = colIdx
 			repeatLength, _ = sheet.Cell(1, colIdx).Int()
 			rp.maxLength = repeatLength
-			pr.repeats = append(pr.repeats, rp)
 			curRepeat = rp
 		case OptStru:
 			// struct length counter
-			if repeatStructLength != 0 {
-				repeatStructLength, _ = sheet.Cell(1, colIdx).Int()
+			repeatStructLength, _ = sheet.Cell(1, colIdx).Int()
+
+			// avoid optional_struct before repeat
+			if curRepeat == nil {
+				fmt.Printf("sheet %v col %v found optional struct without repeat\n", pr.Name, colIdx)
+				repeatStructLength = 0
+				continue
 			}
 
 			// init struct
 			if curRepeat.maxLength == repeatLength {
 				curRepeat.fieldLength, _ = sheet.Cell(1, colIdx).Int()
 				curRepeat.fieldName = sheet.Cell(2, colIdx).Value
+				pr.updateRepeat(curRepeat)
 			}
 		}
 	}
+}
 
-	return pr
+// updateVal if a variable is already in ProtoSheet, update its value, else add it
+func (pr *ProtoSheet) updateVal(val *Val) {
+	if idx, ok := pr.fieldMap[val.name]; ok {
+		// update
+		pr.vars[idx] = val
+		if val.defaultValueStr != pr.vars[idx].defaultValueStr {
+			fmt.Printf("sheet %v variable %v default value %v differs from others %v\n",
+				pr.Name, val.name, val.defaultValueStr, pr.vars[idx].defaultValueStr)
+		}
+	} else {
+		// add
+		idx = len(pr.vars)
+		pr.vars = append(pr.vars, val)
+		pr.fieldMap[val.name] = idx
+	}
+}
+
+// updateRepeat if a repeat has same optional struct name and maxLength as in ProtoSheet, update it, else add it
+func (pr *ProtoSheet) updateRepeat(repeat *Repeat) {
+	if idx, ok := pr.fieldMap[repeat.fieldName]; ok {
+		if repeat.maxLength == pr.repeats[idx].maxLength {
+			// update
+			pr.repeats[idx] = repeat
+		} else {
+			fmt.Printf("sheet %v repeat length %v is not equal as others %v\n", pr.Name, repeat.maxLength, pr.repeats[idx].maxLength)
+		}
+	} else {
+		// add
+		idx = len(pr.repeats)
+		pr.repeats = append(pr.repeats, repeat)
+		pr.fieldMap[repeat.fieldName] = idx
+	}
+}
+
+// resetAllIndex will set all variables including which are inside repeat structure to -1
+func (pr *ProtoSheet) resetAllIndex() {
+	for _, val := range pr.vars {
+		val.colIdx = -1
+	}
+	for _, rp := range pr.repeats {
+		for _, val := range rp.fields {
+			val.colIdx = -1
+		}
+	}
 }
 
 func (pr *ProtoSheet) readData(sheet *xlsx.Sheet) {
@@ -200,7 +278,7 @@ func (pr *ProtoSheet) readData(sheet *xlsx.Sheet) {
 
 	data := make([]byte, 0)
 	for i := RowData; i < sheet.MaxRow; i++ {
-		if row := sheet.Rows[i]; len(row.Cells) != 0 && row.Cells[0].Value != "" {
+		if row := sheet.Rows[i]; len(row.Cells) != 0 && strings.TrimSpace(row.Cells[0].Value) != "" {
 			data = append(data, pr.readRow(row)...)
 		}
 	}
@@ -209,6 +287,9 @@ func (pr *ProtoSheet) readData(sheet *xlsx.Sheet) {
 }
 
 func (rp *Repeat) getCount(row *xlsx.Row) int {
+	if rp.colIdx >= len(row.Cells) {
+		return 0
+	}
 	valCount, err := row.Cells[rp.colIdx].Int()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
@@ -222,9 +303,11 @@ func (rp *Repeat) getCount(row *xlsx.Row) int {
 func (pr *ProtoSheet) readRow(row *xlsx.Row) []byte {
 	rowBuff := proto.NewBuffer([]byte{})
 	for i, val := range pr.vars {
-		if i < len(row.Cells) {
+		if val.colIdx == -1 {   // sheet has no field
+			readCell(rowBuff, val, new(xlsx.Cell))
+		} else if i < len(row.Cells) && val.colIdx < len(row.Cells){
 			readCell(rowBuff, val, row.Cells[val.colIdx]) // Variable part of data
-		} else {
+		} else { // sheet cell is empty
 			readCell(rowBuff, val, new(xlsx.Cell))
 		}
 	}
@@ -237,7 +320,12 @@ func (pr *ProtoSheet) readRow(row *xlsx.Row) []byte {
 			for count := 0; count < rowCount; count++ {
 				fieldBuff.Reset()
 				for _, val := range repeat.fields {
-					readCell(fieldBuff, val, row.Cells[val.colIdx+count*(repeat.fieldLength+1)]) // next variable position = current position + field length + 1
+					// if the rest of a row is blank
+					cell := new(xlsx.Cell)
+					if len(row.Cells) > val.colIdx+count*(repeat.fieldLength+1) {
+						cell = row.Cells[val.colIdx+count*(repeat.fieldLength+1)]
+					}
+					readCell(fieldBuff, val, cell) // next variable position = current position + field length + 1
 				}
 				rpData = append(rpData, fieldBuff.Bytes()...)
 			}

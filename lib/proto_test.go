@@ -8,7 +8,7 @@ import (
 )
 
 func genTestProtoRow() *ProtoSheet {
-	pr := new(ProtoSheet)
+	pr := newProtoRow()
 
 	pr.Name = "TestProtoRow"
 
@@ -37,6 +37,7 @@ func genTestProtoRow() *ProtoSheet {
 		maxLength:   3,
 		fieldName:   "TestRepeatStruct",
 		fieldLength: 1,
+		repeatIdx: 1,
 	}
 
 	rp.fields = append(rp.fields, sh2)
@@ -74,7 +75,7 @@ func TestAddMessageProto2(t *testing.T) {
 	checkOutput("    optional int64 TestRepeat1 = 1;")
 	checkOutput("  }")
 	checkOutput("  ")
-	checkOutput("  repeated TestRepeatStruct testRepeatStruct = 2;")
+	checkOutput("  repeated TestRepeatStruct testrepeatstructs = 2;")
 
 	pr.AddMessageTail()
 	checkOutput("}")
@@ -82,7 +83,7 @@ func TestAddMessageProto2(t *testing.T) {
 
 	pr.AddMessageArray()
 	checkOutput("message TestProtoRow_ARRAY {")
-	checkOutput("  repeated TestProtoRow testProtoRow = 1;")
+	checkOutput("  repeated TestProtoRow testprotorows = 1;")
 	checkOutput("}")
 	checkOutput("")
 }
@@ -116,7 +117,7 @@ func TestAddMessageProto3(t *testing.T) {
 	checkOutput("    int64 TestRepeat1 = 1;")
 	checkOutput("  }")
 	checkOutput("  ")
-	checkOutput("  repeated TestRepeatStruct testRepeatStruct = 2;")
+	checkOutput("  repeated TestRepeatStruct testrepeatstructs = 2;")
 
 	pr.AddMessageTail()
 	checkOutput("}")
@@ -124,7 +125,7 @@ func TestAddMessageProto3(t *testing.T) {
 
 	pr.AddMessageArray()
 	checkOutput("message TestProtoRow_ARRAY {")
-	checkOutput("  repeated TestProtoRow testProtoRow = 1;")
+	checkOutput("  repeated TestProtoRow testprotorows = 1;")
 	checkOutput("}")
 	checkOutput("")
 }
@@ -134,5 +135,5 @@ func TestHash(t *testing.T) {
 	pr.GenProto()
 	pr.Hash()
 
-	assert.Equal(t, "ae5310163da78feec41ba78f243f7f87", hex.EncodeToString(pr.hash[:]))
+	assert.Equal(t, "5c4924a37f3600542bac12ffbe31dd70", hex.EncodeToString(pr.hash[:]))
 }

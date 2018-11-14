@@ -75,6 +75,9 @@ func readCfgFile(cfgFile string) {
 
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
+		if strings.TrimSpace(scanner.Text()) == "" {
+			continue
+		}
 		if err := readCfgLine(scanner.Text()); err != nil {
 			log.Panicln(err)
 		}
@@ -102,7 +105,8 @@ func readCfgLine(cfgLine string) error {
 	for _, sheet := range sheets {
 		if _, ok := sheetNames[sheet]; ok {
 			//return fmt.Errorf("%s name duplicates\n", sheet)
-			fmt.Printf("Duplicate sheet name %s found", sheet) // Enable duplicate sheet names
+			fmt.Printf("Duplicate sheet name %s found\n", sheet) // Enable duplicate sheet names
+			continue
 		}
 
 		sheetNames[sheet] = struct{}{}
