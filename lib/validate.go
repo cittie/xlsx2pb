@@ -39,15 +39,16 @@ func IsXlsxChanged(filename string) bool {
 		return true
 	}
 
-	fname := filepath.Join(cfg.XlsxPath, filename + cfg.XlsxExt)
+	fname := filepath.Join(cfg.XlsxPath, filename+cfg.XlsxExt)
 	if fInfo, ok := cacher.XlsxInfos[filename]; ok {
 		if string(getFileMD5(fname)) == string(fInfo.MD5) {
 			return false
 		}
-		cacher.XlsxInfos[filename] = &XlsxInfo{
-			FileName: filename,
-			MD5:      getFileMD5(fname),
-		}
+	}
+
+	cacher.XlsxInfos[filename] = &XlsxInfo{
+		FileName: filename,
+		MD5:      getFileMD5(fname),
 	}
 
 	return true
@@ -61,4 +62,20 @@ func IsSheetExists(xlsxName string) bool {
 	}
 
 	return false
+}
+
+func IsProtoChanged(ps *ProtoSheet) bool {
+	if cacher == nil {
+		return true
+	}
+
+	if preHash, ok := cacher.ProtoInfos[ps.Name]; ok {
+		if string(preHash) == string(ps.hash) {
+			return false
+		}
+	}
+
+	cacher.ProtoInfos[ps.Name] = ps.hash
+
+	return true
 }

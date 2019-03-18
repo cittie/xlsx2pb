@@ -3,6 +3,7 @@ package lib
 import (
 	"encoding/json"
 	"io/ioutil"
+	"log"
 	"os"
 )
 
@@ -28,7 +29,10 @@ func CacheInit() {
 	cacher = newCacher()
 
 	if _, err := os.Stat(cfg.CacheFile); err == nil {
-		cacher.Load()
+		err := cacher.Load()
+		if err != nil {
+			log.Fatal("load cache fail", err)
+		}
 	}
 }
 
@@ -57,7 +61,7 @@ func (c *Cacher) Load() error {
 
 // Save write current data to cache file as json
 func (c *Cacher) Save() error {
-	rawData, err := json.Marshal(cacher)
+	rawData, err := json.MarshalIndent(cacher, "", "    ")
 	if err != nil {
 		return err
 	}
@@ -73,7 +77,10 @@ func (c *Cacher) Save() error {
 // ClearCache remove saved records and initialize a new cacher
 func ClearCache() {
 	if _, err := os.Stat(cfg.CacheFile); err == nil {
-		os.Remove(cfg.CacheFile)
+		if err := os.Remove(cfg.CacheFile); err != nil {
+			log.Fatal("remove cache failed, ", err)
+			return
+		}
 	}
 
 	cacher = newCacher()

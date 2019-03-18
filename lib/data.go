@@ -21,11 +21,11 @@ type ProtoSheet struct {
 
 // ProtoIn contains data read from xlsx
 type ProtoIn struct {
-	Name    string
-	vars    []*Val
-	repeats []*Repeat
-	hash    []byte
-	fieldMap map[string]int  // map[fieldName]index in vars/repeats
+	Name     string
+	vars     []*Val
+	repeats  []*Repeat
+	hash     []byte
+	fieldMap map[string]int // map[fieldName]index in vars/repeats
 }
 
 // ProtoOut controls how to output proto file
@@ -55,25 +55,25 @@ const (
 
 // Val contains fields for .proto file
 type Val struct {
-	colIdx     int
-	proto2Type string
-	typ        string
-	name       string
-	comment    string
-	fieldNum   int
+	colIdx          int
+	proto2Type      string
+	typ             string
+	name            string
+	comment         string
+	fieldNum        int
 	defaultValueStr string
 }
 
 // Repeat contains repeat filed for .proto file
 type Repeat struct {
-	colIdx      int
-	maxLength   int
-	fieldName   string
-	fieldLength int
-	fieldNum    int
-	repeatIdx   int
-	comment     string
-	fields      []*Val
+	colIdx          int
+	maxLength       int
+	fieldName       string
+	fieldLength     int
+	fieldNum        int
+	repeatIdx       int
+	comment         string
+	fields          []*Val
 	defaultValueStr string
 }
 
@@ -105,6 +105,7 @@ func ReadSheet(fileName, sheetName string) error {
 		return err
 	}
 
+	// Verify all sheets exists in file
 	sheetNames := strings.Split(sheetName, ",")
 	sheets := make([]*xlsx.Sheet, 0)
 	for _, sheetName := range sheetNames {
@@ -115,7 +116,12 @@ func ReadSheet(fileName, sheetName string) error {
 
 		sheets = append(sheets, xlsxSheet)
 	}
-	readSheets(fileName, sheets)
+
+	// Marshal data
+	if err := readSheets(fileName, sheets); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -139,10 +145,7 @@ func readSheets(filename string, sheets []*xlsx.Sheet) error {
 	// check if proto need update
 	pr.GenProto()
 	pr.Hash()
-	if !isCacheOn || string(pr.hash) != string(cacher.ProtoInfos[pr.Name]) {
-		if isCacheOn {
-			cacher.ProtoInfos[pr.Name] = pr.hash
-		}
+	if IsProtoChanged(pr) {
 		pr.WriteProto()
 	}
 
@@ -156,9 +159,9 @@ func readSheets(filename string, sheets []*xlsx.Sheet) error {
 	return nil
 }
 
-func (pr *ProtoSheet)updateHeads(sheet *xlsx.Sheet) {
+func (pr *ProtoSheet) updateHeads(sheet *xlsx.Sheet) {
 	pr.Name = strings.TrimSpace(sheet.Name)
-	pr.resetAllIndex()  // clear previous sheet data
+	pr.resetAllIndex() // clear previous sheet data
 
 	var repeatLength, repeatStructLength int // These are counters for repeat structure
 	var curRepeat *Repeat
@@ -303,9 +306,9 @@ func (rp *Repeat) getCount(row *xlsx.Row) int {
 func (pr *ProtoSheet) readRow(row *xlsx.Row) []byte {
 	rowBuff := proto.NewBuffer([]byte{})
 	for i, val := range pr.vars {
-		if val.colIdx == -1 {   // sheet has no field
+		if val.colIdx == -1 { // sheet has no field
 			readCell(rowBuff, val, new(xlsx.Cell))
-		} else if i < len(row.Cells) && val.colIdx < len(row.Cells){
+		} else if i < len(row.Cells) && val.colIdx < len(row.Cells) {
 			readCell(rowBuff, val, row.Cells[val.colIdx]) // Variable part of data
 		} else { // sheet cell is empty
 			readCell(rowBuff, val, new(xlsx.Cell))
