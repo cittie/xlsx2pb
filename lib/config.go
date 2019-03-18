@@ -18,23 +18,25 @@ type CConfig struct {
 }
 
 type Config struct {
-	ConfigRegExp string `toml:"config_reg_exp"`
-	XlsxPath     string `toml:"xlsx_path"`
-	XlsxExt      string `toml:"xlsx_ext"`
-	PackageName  string `toml:"package_name"`
-	UseProto3    bool   `toml:"use_proto3"`
-	ProtoOutPath string `toml:"proto_path"`
-	ProtoOutExt  string `toml:"proto_ext"`
-	DataOutPath  string `toml:"data_path"`
-	DataOutExt   string `toml:"data_ext"`
-	CacheFile    string `toml:"cache_file"`
+	ConfigRegExp     string `toml:"config_reg_exp"`
+	XlsxPath         string `toml:"xlsx_path"`
+	XlsxExt          string `toml:"xlsx_ext"`
+	PackageName      string `toml:"package_name"`
+	UseProto3        bool   `toml:"use_proto3"`
+	ProtoOutPath     string `toml:"proto_path"`
+	ProtoOutExt      string `toml:"proto_ext"`
+	DataOutPath      string `toml:"data_path"`
+	DataOutExt       string `toml:"data_ext"`
+	CacheFile        string `toml:"cache_file"`
+	ChangeOutputPath string `toml:"change_output_path"`
+	ChangeLog        string `toml:"change_log"`
 }
 
 var (
 	cfg          *Config             // config reading from <package>/conf/config.toml
 	sheetNames   map[string]struct{} // check if duplicate sheet name exists
 	sheetFileMap map[string][]string // map[filename][]sheetnames, e.g. ["Sheet1", "Sheet2, Sheet3"]
-	fileHashMap  map[string][16]byte // map[filename]MD5
+	// fileHashMap  map[string][16]byte // map[filename]MD5
 )
 
 func init() {
@@ -53,7 +55,7 @@ func init() {
 func ResetConfigCache() {
 	sheetNames = make(map[string]struct{})
 	sheetFileMap = make(map[string][]string)
-	fileHashMap = make(map[string][16]byte)
+	// fileHashMap = make(map[string][16]byte)
 }
 
 func getConfigFiles(tarPath string) []string {
@@ -149,4 +151,23 @@ func (c *Config) ReplaceRelPaths() {
 	replaceRelPath(&c.ProtoOutPath)
 	replaceRelPath(&c.DataOutPath)
 	replaceRelPath(&c.CacheFile)
+}
+
+func (c *Config) CheckDirs() {
+	dirs := []string{cfg.ChangeOutputPath, cfg.DataOutPath, cfg.ProtoOutPath}
+	for _, dir := range dirs {
+		if err := checkOrCreateDir(dir); err != nil {
+			log.Fatal(err)
+		}
+	}
+}
+
+func checkOrCreateDir(dir string) error {
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		err := os.MkdirAll(dir, 0777)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }

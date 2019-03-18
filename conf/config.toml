@@ -1,7 +1,7 @@
 [Config]
 # Avoid using "~" or "$GOPATH" in path
 # "." or ".." is acceptable but may cause problems
-xlsx_path = "/Users/jiangyi/go/src/github.com/cittie/xlsx2pb/xlsx/"
+xlsx_path = "/Users/jiangyi/data/data/a3k/"
 
 # Regular Expression of config files
 config_reg_exp = "xlsx*.config"
@@ -11,15 +11,15 @@ xlsx_ext = ""
 # use proto 2 or proto 3
 use_proto3 = false
 
-# proto package name
-package_name = "xlsx2pb"
-
-proto_path = "/Users/jiangyi/go/src/github.com/cittie/xlsx2pb/proto/"
-
+# proto
+package_name = "ProtobufGen"    # proto package name
+proto_path = "/Users/jiangyi/data/proto/"   # path to save all proto files
 proto_ext = ".proto"
 
-data_path = "/Users/jiangyi/go/src/github.com/cittie/xlsx2pb/data/"
-
+data_path = "/Users/jiangyi/data/data/" # path to save all binary files
 data_ext = ".data"
 
-cache_file = "/Users/jiangyi/go/src/github.com/cittie/xlsx2pb/cache/cache.json"
+cache_file = "/Users/jiangyi/data/cache/cache.json"
+
+change_output_path = "/Users/jiangyi/data/output"  # path to save all changed files
+change_log = "/Users/jiangyi/data/output/changelog.json"
