@@ -105,8 +105,10 @@ func (c *Cacher) Save() error {
 
 	for pName, info := range c.ProtoInfos {
 		switch info.State {
-		case None:
-			delete(c.ProtoInfos, pName)
+		/*
+			case None:
+				delete(c.ProtoInfos, pName)
+		*/
 		case Updated, New:
 			changes.ProtoInfos[pName] = info
 			if err := CopyChangedProtoFiles(pName); err != nil {
@@ -125,7 +127,7 @@ func (c *Cacher) Save() error {
 		return err
 	}
 
-	changesRaw, err := json.MarshalIndent(cacher, "", "    ")
+	changesRaw, err := json.MarshalIndent(changes, "", "    ")
 	if err != nil {
 		return err
 	}
@@ -153,6 +155,7 @@ func ClearCache() {
 // CopyChangedProtoFiles if a file is changed, copy both proto and data file to output dir
 func CopyChangedProtoFiles(fName string) error {
 	fn := strings.ToLower(fName)
+
 	srcDataFile := filepath.Join(cfg.DataOutPath, fn+cfg.DataOutExt)
 	_, err := os.Stat(srcDataFile)
 	if err != nil {
@@ -173,6 +176,9 @@ func CopyChangedProtoFiles(fName string) error {
 	defer dstData.Close()
 
 	_, err = io.Copy(dstData, srcData)
+	if err != nil {
+		return err
+	}
 
 	srcProtoFile := filepath.Join(cfg.ProtoOutPath, fn+cfg.ProtoOutExt)
 	_, err = os.Stat(srcProtoFile)

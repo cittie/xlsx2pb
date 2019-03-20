@@ -11,8 +11,8 @@ import (
 
 var (
 	// INDENT Use 2 spaces
-	INDENT    = "  "
-	curIndent string
+	INDENT               = "  "
+	curIndent            string
 	defaultStructureName = "Default"
 )
 
@@ -37,6 +37,22 @@ func (pr *ProtoSheet) GenProto() {
 
 	// MessageArray
 	pr.AddMessageArray()
+
+	/*
+		// Debug
+		fmt.Printf("ProtoSheet: %+v\n", pr)
+
+			for _, v := range pr.vars {
+				fmt.Printf("Val: %+v\n", v)
+			}
+
+			for _, v := range pr.repeats {
+				fmt.Printf("Repeats: %+v\n", v)
+				for _, v := range v.fields {
+					fmt.Printf("RepeatVal: %+v\n", v)
+				}
+			}
+	*/
 }
 
 // Hash generate hash of proto content
@@ -85,13 +101,14 @@ func (pr *ProtoSheet) AddMessageHead(name string) {
 }
 
 // AddOneDefine add a proto defination
-func (pr *ProtoSheet) AddOneDefine(isRepeat bool, comment, p2type, typ, name string, idx *int) {
+func (pr *ProtoSheet) AddOneDefine(isRepeat bool, comment, p2type, typ, name, defaultValStr string, idx *int) {
+	defaultStr := fmt.Sprintf(" [default = %s]", defaultValStr)
 	if comment != "" {
 		pr.outProto = append(pr.outProto, fmt.Sprintf("%s/* %s */", curIndent, comment)) // comment
 	}
 	if name == "" {
 		name = title2Lowercase(strings.TrimSpace(typ)) // struct use type name as name
-		if name == "" { // if name is still missing, use a default name
+		if name == "" {                                // if name is still missing, use a default name
 			name = defaultStructureName
 		}
 	}
@@ -103,8 +120,9 @@ func (pr *ProtoSheet) AddOneDefine(isRepeat bool, comment, p2type, typ, name str
 	}
 	if isRepeat {
 		typ = "repeated " + typ
+		defaultStr = ""
 	}
-	pr.outProto = append(pr.outProto, fmt.Sprintf("%s%s %s = %d;", curIndent, typ, name, *idx)) // define
+	pr.outProto = append(pr.outProto, fmt.Sprintf("%s%s %s = %d%s;", curIndent, typ, name, *idx, defaultStr)) // define
 	*idx++
 }
 
@@ -117,8 +135,8 @@ func (pr *ProtoSheet) AddMessageTail() {
 
 // AddVal add a proto variable define
 func (pr *ProtoSheet) AddVal(sh *Val) {
-	pr.AddOneDefine(false, sh.comment, sh.proto2Type, sh.typ, sh.name, &pr.varIdx)
-	sh.fieldNum = pr.varIdx
+	pr.AddOneDefine(false, sh.comment, sh.proto2Type, sh.typ, sh.name, sh.defaultValueStr, &pr.varIdx)
+	sh.fieldNum = pr.varIdx - 1
 }
 
 // AddRepeat add repeat struct
@@ -140,20 +158,21 @@ func (pr *ProtoSheet) AddRepeat(repeat *Repeat) {
 // AddRepeatDefine add repeat inner define
 func (pr *ProtoSheet) AddRepeatDefine(repeat *Repeat) {
 	for _, sh := range repeat.fields {
-		pr.AddOneDefine(false, sh.comment, sh.proto2Type, sh.typ, sh.name, &repeat.repeatIdx)
+		pr.AddOneDefine(false, sh.comment, sh.proto2Type, sh.typ, sh.name, sh.defaultValueStr, &repeat.repeatIdx)
+		sh.fieldNum = repeat.repeatIdx - 1
 	}
 }
 
 // AddRepeatTail add repeat declare
 func (pr *ProtoSheet) AddRepeatTail(repeat *Repeat) {
-	pr.AddOneDefine(true, repeat.comment, "", repeat.fieldName, repeat.comment, &pr.varIdx)
-	repeat.fieldNum = pr.varIdx
+	pr.AddOneDefine(true, repeat.fieldName, "", repeat.fieldName, repeat.comment, repeat.defaultValueStr, &pr.varIdx)
+	repeat.fieldNum = pr.varIdx - 1
 }
 
 // AddMessageArray add an array for current message as XXX_ARRAY
 func (pr *ProtoSheet) AddMessageArray() {
 	pr.AddMessageHead(pr.Name + "_ARRAY")
-	pr.outProto = append(pr.outProto, fmt.Sprintf("%srepeated %s %s = 1;", curIndent, pr.Name, title2Lowercase(pr.Name)))
+	pr.outProto = append(pr.outProto, fmt.Sprintf("%srepeated %s items = 1;", curIndent, pr.Name))
 	pr.AddMessageTail()
 }
 

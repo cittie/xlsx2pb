@@ -47,6 +47,7 @@ func IsXlsxChanged(filename string) bool {
 		}
 
 		fInfo.State = Updated
+		return true
 	}
 
 	cacher.XlsxInfos[filename] = &XlsxInfo{

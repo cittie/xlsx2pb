@@ -134,6 +134,11 @@ func readSheets(filename string, sheets []*xlsx.Sheet) error {
 
 		// update head for each sheet, avoiding empty columns changes the col index
 		pr.updateHeads(sheet)
+
+		// check if proto need update
+		pr.GenProto()
+		pr.Hash()
+
 		pr.readData(sheet)
 	}
 
@@ -142,9 +147,6 @@ func readSheets(filename string, sheets []*xlsx.Sheet) error {
 		pr.Name = strings.TrimSpace(strings.TrimSuffix(filename, ".xlsx"))
 	}
 
-	// check if proto need update
-	pr.GenProto()
-	pr.Hash()
 	if IsProtoChanged(pr) {
 		pr.WriteProto()
 	}
@@ -169,7 +171,7 @@ func (pr *ProtoSheet) updateHeads(sheet *xlsx.Sheet) {
 	// fmt.Printf("readHeads for %v ...\n", pr.Name)
 
 	for colIdx := 0; colIdx < sheet.MaxCol; colIdx++ {
-		headType := sheet.Cell(0, colIdx).Value
+		headType := sheet.Cell(RowAttr, colIdx).Value
 
 		if headType == "" {
 			continue
@@ -182,6 +184,10 @@ func (pr *ProtoSheet) updateHeads(sheet *xlsx.Sheet) {
 			val.proto2Type = headType
 			val.typ = sheet.Cell(RowType, colIdx).Value
 			val.name = sheet.Cell(RowID, colIdx).Value
+			val.defaultValueStr = "0"
+			if val.typ == "string" {
+				val.defaultValueStr = ""
+			}
 			// If val name has default value
 			if strings.Contains(val.name, "=") {
 				parts := strings.Split(val.name, "=")
@@ -205,12 +211,12 @@ func (pr *ProtoSheet) updateHeads(sheet *xlsx.Sheet) {
 		case Rep:
 			rp := newRepeat()
 			rp.colIdx = colIdx
-			repeatLength, _ = sheet.Cell(1, colIdx).Int()
+			repeatLength, _ = sheet.Cell(RowType, colIdx).Int()
 			rp.maxLength = repeatLength
 			curRepeat = rp
 		case OptStru:
 			// struct length counter
-			repeatStructLength, _ = sheet.Cell(1, colIdx).Int()
+			repeatStructLength, _ = sheet.Cell(RowType, colIdx).Int()
 
 			// avoid optional_struct before repeat
 			if curRepeat == nil {
@@ -221,8 +227,9 @@ func (pr *ProtoSheet) updateHeads(sheet *xlsx.Sheet) {
 
 			// init struct
 			if curRepeat.maxLength == repeatLength {
-				curRepeat.fieldLength, _ = sheet.Cell(1, colIdx).Int()
-				curRepeat.fieldName = sheet.Cell(2, colIdx).Value
+				curRepeat.fieldLength, _ = sheet.Cell(RowType, colIdx).Int()
+				curRepeat.fieldName = sheet.Cell(RowID, colIdx).Value
+				curRepeat.comment = sheet.Cell(RowComment, colIdx).Value
 				pr.updateRepeat(curRepeat)
 			}
 		}
@@ -276,17 +283,17 @@ func (pr *ProtoSheet) resetAllIndex() {
 }
 
 func (pr *ProtoSheet) readData(sheet *xlsx.Sheet) {
-	// Add Tag
-	pr.buf.EncodeVarint(uint64(10)) // (1 << 3) | 2 = 10
-
-	data := make([]byte, 0)
 	for i := RowData; i < sheet.MaxRow; i++ {
 		if row := sheet.Rows[i]; len(row.Cells) != 0 && strings.TrimSpace(row.Cells[0].Value) != "" {
-			data = append(data, pr.readRow(row)...)
+			rawRowData := pr.readRow(row)
+			if len(rawRowData) != 0 {
+				// Add Tag
+				pr.buf.EncodeVarint(uint64(10)) // (1 << 3) | 2 = 10
+				// Add contents
+				pr.buf.EncodeRawBytes(rawRowData)
+			}
 		}
 	}
-
-	pr.buf.EncodeRawBytes(data)
 }
 
 func (rp *Repeat) getCount(row *xlsx.Row) int {
@@ -317,11 +324,10 @@ func (pr *ProtoSheet) readRow(row *xlsx.Row) []byte {
 
 	for _, repeat := range pr.repeats {
 		if rowCount := repeat.getCount(row); rowCount > 0 {
-			rowBuff.EncodeVarint(uint64((repeat.fieldNum << 3) | 2)) // Add Repeat Tag
-			rpData := make([]byte, 0)
 			fieldBuff := proto.NewBuffer([]byte{})
 			for count := 0; count < rowCount; count++ {
 				fieldBuff.Reset()
+				rowBuff.EncodeVarint(uint64((repeat.fieldNum << 3) | 2)) // Add Repeat Tag
 				for _, val := range repeat.fields {
 					// if the rest of a row is blank
 					cell := new(xlsx.Cell)
@@ -330,9 +336,8 @@ func (pr *ProtoSheet) readRow(row *xlsx.Row) []byte {
 					}
 					readCell(fieldBuff, val, cell) // next variable position = current position + field length + 1
 				}
-				rpData = append(rpData, fieldBuff.Bytes()...)
+				rowBuff.EncodeRawBytes(fieldBuff.Bytes())
 			}
-			rowBuff.EncodeRawBytes(rpData) // Add Repeat data
 		}
 	}
 
@@ -341,21 +346,13 @@ func (pr *ProtoSheet) readRow(row *xlsx.Row) []byte {
 
 // readCell add "Tag - Value" or "Tag - Length - Value" to buffer according to var type
 func readCell(b *proto.Buffer, val *Val, cell *xlsx.Cell) {
-	tag := func(wireType int) {
-		b.EncodeVarint(uint64((val.fieldNum << 3) | wireType))
-	}
-
-	// if val has default value and cell is blank, use default value instead
 	if cell.Value == "" {
-		if val.defaultValueStr == "" {
-			return
-		}
-		cell.SetValue(val.defaultValueStr)
+		return
 	}
 
 	switch val.typ {
 	case "int32", "int64", "uint32", "uint64":
-		tag(0)
+		b.EncodeVarint(uint64((val.fieldNum << 3) | proto.WireVarint))
 		intVal, err := cell.Int()
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err.Error())
@@ -363,23 +360,31 @@ func readCell(b *proto.Buffer, val *Val, cell *xlsx.Cell) {
 		}
 		b.EncodeVarint(uint64(intVal))
 	case "sint32", "sint64":
-		tag(0)
+		b.EncodeVarint(uint64((val.fieldNum << 3) | proto.WireVarint))
 		intVal, err := cell.Int()
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err.Error())
 			return
 		}
 		b.EncodeZigzag64(uint64(intVal))
-	case "float", "float64":
-		tag(1)
+	case "float", "float32":
+		b.EncodeVarint(uint64((val.fieldNum << 3) | proto.WireFixed32))
 		floatVal, err := cell.Float()
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err.Error())
 			return
 		}
-		b.EncodeFixed64(math.Float64bits(floatVal))
+		b.EncodeFixed32(math.Float64bits(floatVal))
+	case "float64":
+		b.EncodeVarint(uint64((val.fieldNum << 3) | proto.WireFixed64))
+		floatVal, err := cell.Float()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err.Error())
+			return
+		}
+		b.EncodeFixed64(uint64(math.Float32bits(float32(floatVal))))
 	case "string":
-		tag(2)
+		b.EncodeVarint(uint64((val.fieldNum << 3) | proto.WireBytes))
 		b.EncodeStringBytes(cell.Value) // length included
 	default:
 		fmt.Fprintf(os.Stderr, "invalid var type: %v\n", val.typ)

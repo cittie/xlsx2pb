@@ -35,7 +35,9 @@ Use following param to turn off cache:
 
 ## Support data types
 
-* float(float64)
+* float(float32)
+* float32
+* float64
 * int32
 * int64
 * uint32

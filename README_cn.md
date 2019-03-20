@@ -36,7 +36,9 @@
 
 ## 支持的数据类型
 
-* float(float64)
+* float // 默认为float32
+* float32
+* float64
 * int32
 * int64
 * uint32
