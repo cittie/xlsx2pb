@@ -11,9 +11,9 @@ import (
 
 var (
 	testSheet *xlsx.Sheet
-	xlsxPath string
+	xlsxPath  string
 	protoPath string
-	dataPath string
+	dataPath  string
 )
 
 func init() {
@@ -60,8 +60,8 @@ func TestReadHeads(t *testing.T) {
 	assert.Equal(t, "Comment4", pr.repeats[0].fields[0].comment)
 }
 
-func TestWriteProto(t *testing.T) {
-	tarFile := "../proto/sampleone.proto"
+/*func TestWriteProto(t *testing.T) {
+	tarFile := "../test/sampleone.proto"
 
 	pr := newProtoRow()
 	pr.updateHeads(testSheet)
@@ -78,7 +78,7 @@ func TestWriteProto(t *testing.T) {
 	assert.Equal(t, getFileMD5("../test/sampleone3.proto"), getFileMD5(tarFile))
 
 	//defer os.Remove(tarFile)
-}
+}*/
 
 func TestReadCell(t *testing.T) {
 	tests := []struct {
@@ -92,7 +92,7 @@ func TestReadCell(t *testing.T) {
 		{"86942", "uint64", []byte{0, 158, 167, 5}},
 		{"128", "sint32", []byte{0, 128, 2}},
 		{"-2", "sint64", []byte{0, 3}},
-		{"0.125", "float", []byte{1, 0, 0, 0, 0, 0, 0, 192, 63}},
+		{"0.125", "float", []byte{5, 0, 0, 0, 0}},
 		{"testing", "string", []byte{2, 7, 116, 101, 115, 116, 105, 110, 103}},
 	}
 
@@ -114,14 +114,14 @@ func TestReadData(t *testing.T) {
 	pr.updateHeads(testSheet)
 	pr.readData(testSheet)
 
-	assert.Equal(t, 247, len(pr.buf.Bytes()))
+	assert.Equal(t, 260, len(pr.buf.Bytes()))
 }
 
 func TestReadSheet(t *testing.T) {
 	MockUp()
 
-	rmTmp := func () {
-		for _, tmp := range []string {"../test/sampleone.data", "../test/sampleone.proto"} {
+	rmTmp := func() {
+		for _, tmp := range []string{"../test/sampleone.data", "../test/sampleone.proto"} {
 			if _, err := os.Stat(tmp); err == nil {
 				os.Remove(tmp)
 			}
@@ -129,10 +129,6 @@ func TestReadSheet(t *testing.T) {
 	}
 
 	err := ReadSheet("Sample.xlsx", "SAMPLEONE")
-	assert.Nil(t, err)
-
-	isCacheOn = true
-	err = ReadSheet("Sample.xlsx", "SAMPLEONE")
 	assert.Nil(t, err)
 
 	rmTmp()

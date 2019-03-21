@@ -15,11 +15,11 @@ var (
 func setup() {
 	testCacher = newCacher()
 
-	info := new(XlsxInfo)
-	info.FileName = "CACHETESTSHEET"
+	info := new(DataInfo)
+	info.Name = "CACHETESTSHEET"
 	copy(info.MD5[:], []byte("f7ffd6e04e02a743fe8bec550e64cb71"))
 
-	testCacher.XlsxInfos[info.FileName] = info
+	testCacher.XlsxInfos[info.Name] = info
 
 	// mock filename
 	preCacheFileName = cfg.CacheFile

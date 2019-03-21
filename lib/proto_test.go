@@ -14,30 +14,33 @@ func genTestProtoRow() *ProtoSheet {
 
 	// Field
 	sh := &Val{
-		colIdx:     0,
-		proto2Type: "optional",
-		typ:        "string",
-		name:       "TestField1",
-		comment:    "* This is TestFiled1 *",
+		colIdx:          0,
+		proto2Type:      "optional",
+		typ:             "string",
+		name:            "TestField1",
+		comment:         "* This is TestFiled1 *",
+		defaultValueStr: `"default"`,
 	}
 
 	// Repeat Field
 	sh2 := &Val{
-		colIdx:     1,
-		proto2Type: "optional",
-		typ:        "int64",
-		name:       "TestRepeat1",
-		comment:    "** This is TestRepeat1 **",
+		colIdx:          1,
+		proto2Type:      "optional",
+		typ:             "int64",
+		name:            "TestRepeat1",
+		comment:         "** This is TestRepeat1 **",
+		defaultValueStr: "0",
 	}
 
 	pr.vars = append(pr.vars, sh)
 
 	// Repeat Struct
 	rp := &Repeat{
-		maxLength:   3,
-		fieldName:   "TestRepeatStruct",
-		fieldLength: 1,
-		repeatIdx: 1,
+		maxLength:       3,
+		fieldName:       "TestRepeatStruct",
+		fieldLength:     1,
+		repeatIdx:       1,
+		defaultValueStr: `""`,
 	}
 
 	rp.fields = append(rp.fields, sh2)
@@ -58,7 +61,7 @@ func TestAddMessageProto2(t *testing.T) {
 
 	pr.AddPreHead()
 	checkOutput("syntax = \"proto2\";")
-	checkOutput("package xlsx2pb;")
+	checkOutput("package ProtobufGen;")
 	checkOutput("")
 
 	pr.AddMessageHead(pr.Name)
@@ -66,15 +69,16 @@ func TestAddMessageProto2(t *testing.T) {
 
 	pr.AddVal(pr.vars[0])
 	checkOutput("  /* * This is TestFiled1 * */")
-	checkOutput("  optional string TestField1 = 1;")
+	checkOutput("  optional string TestField1 = 1 [default = \"default\"];")
 
 	pr.AddRepeat(pr.repeats[0])
 	checkOutput("  ")
 	checkOutput("  message TestRepeatStruct {")
 	checkOutput("    /* ** This is TestRepeat1 ** */")
-	checkOutput("    optional int64 TestRepeat1 = 1;")
+	checkOutput("    optional int64 TestRepeat1 = 1 [default = 0];")
 	checkOutput("  }")
 	checkOutput("  ")
+	checkOutput("  /* TestRepeatStruct */")
 	checkOutput("  repeated TestRepeatStruct testrepeatstructs = 2;")
 
 	pr.AddMessageTail()
@@ -83,7 +87,7 @@ func TestAddMessageProto2(t *testing.T) {
 
 	pr.AddMessageArray()
 	checkOutput("message TestProtoRow_ARRAY {")
-	checkOutput("  repeated TestProtoRow testprotorows = 1;")
+	checkOutput("  repeated TestProtoRow items = 1;")
 	checkOutput("}")
 	checkOutput("")
 }
@@ -100,7 +104,7 @@ func TestAddMessageProto3(t *testing.T) {
 
 	pr.AddPreHead()
 	checkOutput("syntax = \"proto3\";")
-	checkOutput("package xlsx2pb;")
+	checkOutput("package ProtobufGen;")
 	checkOutput("")
 
 	pr.AddMessageHead(pr.Name)
@@ -108,15 +112,16 @@ func TestAddMessageProto3(t *testing.T) {
 
 	pr.AddVal(pr.vars[0])
 	checkOutput("  /* * This is TestFiled1 * */")
-	checkOutput("  string TestField1 = 1;")
+	checkOutput("  string TestField1 = 1 [default = \"default\"];")
 
 	pr.AddRepeat(pr.repeats[0])
 	checkOutput("  ")
 	checkOutput("  message TestRepeatStruct {")
 	checkOutput("    /* ** This is TestRepeat1 ** */")
-	checkOutput("    int64 TestRepeat1 = 1;")
+	checkOutput("    int64 TestRepeat1 = 1 [default = 0];")
 	checkOutput("  }")
 	checkOutput("  ")
+	checkOutput("  /* TestRepeatStruct */")
 	checkOutput("  repeated TestRepeatStruct testrepeatstructs = 2;")
 
 	pr.AddMessageTail()
@@ -125,7 +130,7 @@ func TestAddMessageProto3(t *testing.T) {
 
 	pr.AddMessageArray()
 	checkOutput("message TestProtoRow_ARRAY {")
-	checkOutput("  repeated TestProtoRow testprotorows = 1;")
+	checkOutput("  repeated TestProtoRow items = 1;")
 	checkOutput("}")
 	checkOutput("")
 }
@@ -133,7 +138,7 @@ func TestAddMessageProto3(t *testing.T) {
 func TestHash(t *testing.T) {
 	pr := genTestProtoRow()
 	pr.GenProto()
-	pr.Hash()
+	pr.ProtoHash()
 
-	assert.Equal(t, "5c4924a37f3600542bac12ffbe31dd70", hex.EncodeToString(pr.hash[:]))
+	assert.Equal(t, "9dcd1a127603012b57f5f41681660392", hex.EncodeToString(pr.protoHash[:]))
 }

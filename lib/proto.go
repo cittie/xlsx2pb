@@ -86,7 +86,7 @@ func (pr *ProtoSheet) AddMessageHead(name string) {
 
 // AddOneDefine add a proto defination
 func (pr *ProtoSheet) AddOneDefine(isRepeat bool, comment, p2type, typ, name, defaultValStr string, idx *int) {
-	defaultStr := fmt.Sprintf(" [default = %s]", defaultValStr)
+	defaultStr := fmt.Sprintf(" [default = %v]", defaultValStr)
 	if comment != "" {
 		pr.outProto = append(pr.outProto, fmt.Sprintf("%s/* %s */", curIndent, comment)) // comment
 	}
@@ -106,7 +106,7 @@ func (pr *ProtoSheet) AddOneDefine(isRepeat bool, comment, p2type, typ, name, de
 		typ = "repeated " + typ
 		defaultStr = ""
 	}
-	pr.outProto = append(pr.outProto, fmt.Sprintf("%s%s %s = %d%s;", curIndent, typ, name, *idx, defaultStr)) // define
+	pr.outProto = append(pr.outProto, fmt.Sprintf("%s%s %s = %d%v;", curIndent, typ, name, *idx, defaultStr)) // define
 	*idx++
 }
 

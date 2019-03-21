@@ -195,7 +195,7 @@ func (pr *ProtoSheet) updateHeads(sheet *xlsx.Sheet) {
 			val.name = sheet.Cell(RowID, colIdx).Value
 			val.defaultValueStr = "0"
 			if val.typ == "string" {
-				val.defaultValueStr = ""
+				val.defaultValueStr = `""`
 			}
 			// If val name has default value
 			if strings.Contains(val.name, "=") {
