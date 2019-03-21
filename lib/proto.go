@@ -37,31 +37,15 @@ func (pr *ProtoSheet) GenProto() {
 
 	// MessageArray
 	pr.AddMessageArray()
-
-	/*
-		// Debug
-		fmt.Printf("ProtoSheet: %+v\n", pr)
-
-			for _, v := range pr.vars {
-				fmt.Printf("Val: %+v\n", v)
-			}
-
-			for _, v := range pr.repeats {
-				fmt.Printf("Repeats: %+v\n", v)
-				for _, v := range v.fields {
-					fmt.Printf("RepeatVal: %+v\n", v)
-				}
-			}
-	*/
 }
 
 // Hash generate hash of proto content
-func (pr *ProtoSheet) Hash() {
+func (pr *ProtoSheet) ProtoHash() {
 	hash := md5.New()
 	for _, line := range pr.outProto {
 		hash.Write([]byte(line))
 	}
-	pr.hash = hash.Sum(nil)
+	pr.protoHash = hash.Sum(nil)
 }
 
 // IncreaseIndent increase indent
@@ -187,10 +171,16 @@ func (pr *ProtoSheet) WriteProto() {
 
 	w := bufio.NewWriter(f)
 	for _, line := range pr.outProto {
-		w.WriteString(line + "\n")
+		_, err := w.WriteString(line + "\n")
+		if err != nil {
+			panic(err)
+		}
 	}
 
-	w.Flush()
+	err = w.Flush()
+	if err != nil {
+		panic(err)
+	}
 
 	if err := f.Close(); err != nil {
 		fmt.Println(err.Error())

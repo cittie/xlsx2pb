@@ -11,9 +11,8 @@ import (
 )
 
 var (
-	isCacheOn bool
-	cacher    *Cacher
-	changes   *Cacher
+	cacher  *Cacher
+	changes *Cacher
 )
 
 type CacheStatus int
@@ -27,19 +26,14 @@ const (
 
 // Cacher is handler for cache
 type Cacher struct {
-	XlsxInfos  map[string]*XlsxInfo  `json:"xlsx_info"`
-	ProtoInfos map[string]*ProtoInfo `json:"proto_info"`
+	XlsxInfos  map[string]*DataInfo `json:"xlsx_info"`
+	ProtoInfos map[string]*DataInfo `json:"proto_info"`
+	DataInfos  map[string]*DataInfo `json:"data_info"`
 }
 
 // XlsxInfo contains sheet information in xlsx files
-type XlsxInfo struct {
-	FileName string      `json:"filename"`
-	MD5      []byte      `json:"md5"`
-	State    CacheStatus `json:"-"` // 0: previous 1: updated 2: new
-}
-
-type ProtoInfo struct {
-	Name  string      `json:"proto_name"`
+type DataInfo struct {
+	Name  string      `json:"name"`
 	MD5   []byte      `json:"md5"`
 	State CacheStatus `json:"-"` // 0: previous 1: updated 2: new
 }
@@ -59,8 +53,9 @@ func CacheInit() {
 
 func newCacher() *Cacher {
 	cacher := new(Cacher)
-	cacher.XlsxInfos = make(map[string]*XlsxInfo)
-	cacher.ProtoInfos = make(map[string]*ProtoInfo)
+	cacher.XlsxInfos = make(map[string]*DataInfo)
+	cacher.ProtoInfos = make(map[string]*DataInfo)
+	cacher.DataInfos = make(map[string]*DataInfo)
 
 	return cacher
 }
@@ -96,8 +91,6 @@ func (c *Cacher) Save() error {
 	// clear files not appears in current time
 	for fName, info := range c.XlsxInfos {
 		switch info.State {
-		case None:
-			delete(c.XlsxInfos, fName)
 		case Updated, New:
 			changes.XlsxInfos[fName] = info
 		}
@@ -105,13 +98,19 @@ func (c *Cacher) Save() error {
 
 	for pName, info := range c.ProtoInfos {
 		switch info.State {
-		/*
-			case None:
-				delete(c.ProtoInfos, pName)
-		*/
 		case Updated, New:
 			changes.ProtoInfos[pName] = info
 			if err := CopyChangedProtoFiles(pName); err != nil {
+				return err
+			}
+		}
+	}
+
+	for dName, info := range c.DataInfos {
+		switch info.State {
+		case Updated, New:
+			changes.ProtoInfos[dName] = info
+			if err := CopyChangedDataFiles(dName); err != nil {
 				return err
 			}
 		}
@@ -152,8 +151,36 @@ func ClearCache() {
 	cacher = newCacher()
 }
 
-// CopyChangedProtoFiles if a file is changed, copy both proto and data file to output dir
+// CopyChangedProtoFiles if a proto file is changed, copy both proto and data file to output dir
 func CopyChangedProtoFiles(fName string) error {
+	fn := strings.ToLower(fName)
+
+	srcProtoFile := filepath.Join(cfg.ProtoOutPath, fn+cfg.ProtoOutExt)
+	_, err := os.Stat(srcProtoFile)
+	if err != nil {
+		return err
+	}
+
+	srcProto, err := os.Open(srcProtoFile)
+	if err != nil {
+		return err
+	}
+	defer srcProto.Close()
+
+	dstProtoFile := filepath.Join(cfg.ChangeOutputPath, "proto", fn+cfg.ProtoOutExt)
+	dstProto, err := os.Create(dstProtoFile)
+	if err != nil {
+		return err
+	}
+	defer dstProto.Close()
+
+	_, err = io.Copy(dstProto, srcProto)
+
+	return err
+}
+
+// CopyChangedDataFiles if a data file is changed, copy data file to output dir
+func CopyChangedDataFiles(fName string) error {
 	fn := strings.ToLower(fName)
 
 	srcDataFile := filepath.Join(cfg.DataOutPath, fn+cfg.DataOutExt)
@@ -179,27 +206,6 @@ func CopyChangedProtoFiles(fName string) error {
 	if err != nil {
 		return err
 	}
-
-	srcProtoFile := filepath.Join(cfg.ProtoOutPath, fn+cfg.ProtoOutExt)
-	_, err = os.Stat(srcProtoFile)
-	if err != nil {
-		return err
-	}
-
-	srcProto, err := os.Open(srcProtoFile)
-	if err != nil {
-		return err
-	}
-	defer srcProto.Close()
-
-	dstProtoFile := filepath.Join(cfg.ChangeOutputPath, "proto", fn+cfg.ProtoOutExt)
-	dstProto, err := os.Create(dstProtoFile)
-	if err != nil {
-		return err
-	}
-	defer dstProto.Close()
-
-	_, err = io.Copy(dstProto, srcProto)
 
 	return err
 }

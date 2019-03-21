@@ -41,19 +41,21 @@ func IsXlsxChanged(filename string) bool {
 
 	fname := filepath.Join(cfg.XlsxPath, filename+cfg.XlsxExt)
 	if fInfo, ok := cacher.XlsxInfos[filename]; ok {
-		if string(getFileMD5(fname)) == string(fInfo.MD5) {
+		fHash := getFileMD5(fname)
+		if string(fHash) == string(fInfo.MD5) {
 			fInfo.State = Remained
 			return false
 		}
 
+		fInfo.MD5 = fHash
 		fInfo.State = Updated
 		return true
 	}
 
-	cacher.XlsxInfos[filename] = &XlsxInfo{
-		FileName: filename,
-		MD5:      getFileMD5(fname),
-		State:    New,
+	cacher.XlsxInfos[filename] = &DataInfo{
+		Name:  filename,
+		MD5:   getFileMD5(fname),
+		State: New,
 	}
 
 	return true
@@ -76,18 +78,44 @@ func IsProtoChanged(ps *ProtoSheet) bool {
 	}
 
 	if info, ok := cacher.ProtoInfos[ps.Name]; ok {
-		if string(info.MD5) == string(ps.hash) {
+		if string(info.MD5) == string(ps.protoHash) {
 			info.State = Remained
 			return false
 		}
 
+		info.MD5 = ps.protoHash
 		info.State = Updated
 		return true
 	}
 
-	cacher.ProtoInfos[ps.Name] = &ProtoInfo{
+	cacher.ProtoInfos[ps.Name] = &DataInfo{
 		Name:  ps.Name,
-		MD5:   ps.hash,
+		MD5:   ps.protoHash,
+		State: New,
+	}
+
+	return true
+}
+
+func IsDataChanged(ps *ProtoSheet) bool {
+	if cacher == nil {
+		return true
+	}
+
+	if info, ok := cacher.DataInfos[ps.Name]; ok {
+		if string(info.MD5) == string(ps.dataHash) {
+			info.State = Remained
+			return false
+		}
+
+		info.MD5 = ps.dataHash
+		info.State = Updated
+		return true
+	}
+
+	cacher.DataInfos[ps.Name] = &DataInfo{
+		Name:  ps.Name,
+		MD5:   ps.dataHash,
 		State: New,
 	}
 

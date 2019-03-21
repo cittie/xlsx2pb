@@ -2,7 +2,9 @@ package lib
 
 import (
 	"bufio"
+	"crypto/md5"
 	"fmt"
+	"log"
 	"math"
 	"os"
 	"path/filepath"
@@ -24,16 +26,17 @@ type ProtoIn struct {
 	Name     string
 	vars     []*Val
 	repeats  []*Repeat
-	hash     []byte
+	dataHash []byte
 	fieldMap map[string]int // map[fieldName]index in vars/repeats
 }
 
 // ProtoOut controls how to output proto file
 type ProtoOut struct {
-	varIdx   int
-	tabCount int
-	isProto3 bool
-	outProto []string
+	varIdx    int
+	tabCount  int
+	isProto3  bool
+	protoHash []byte
+	outProto  []string
 }
 
 // Row index in sheet
@@ -127,6 +130,9 @@ func ReadSheet(fileName, sheetName string) error {
 
 func readSheets(filename string, sheets []*xlsx.Sheet) error {
 	pr := newProtoRow()
+
+	hasGenProto := false
+
 	for _, sheet := range sheets {
 		if sheet.MaxRow < RowData {
 			return fmt.Errorf("sheet %v contains no data", sheet)
@@ -136,8 +142,12 @@ func readSheets(filename string, sheets []*xlsx.Sheet) error {
 		pr.updateHeads(sheet)
 
 		// check if proto need update
-		pr.GenProto()
-		pr.Hash()
+		// only hash
+		if !hasGenProto {
+			pr.GenProto()
+			pr.ProtoHash()
+			hasGenProto = true
+		}
 
 		pr.readData(sheet)
 	}
@@ -151,8 +161,7 @@ func readSheets(filename string, sheets []*xlsx.Sheet) error {
 		pr.WriteProto()
 	}
 
-	// always write data if xlsx file changed
-	if pr != nil {
+	if pr != nil && IsDataChanged(pr) {
 		pr.WriteData()
 	}
 
@@ -168,12 +177,12 @@ func (pr *ProtoSheet) updateHeads(sheet *xlsx.Sheet) {
 	var repeatLength, repeatStructLength int // These are counters for repeat structure
 	var curRepeat *Repeat
 
-	// fmt.Printf("readHeads for %v ...\n", pr.Name)
+	fmt.Printf("readHeads for %v ...\n", pr.Name)
 
 	for colIdx := 0; colIdx < sheet.MaxCol; colIdx++ {
 		headType := sheet.Cell(RowAttr, colIdx).Value
 
-		if headType == "" {
+		if strings.TrimSpace(headType) == "" {
 			continue
 		}
 
@@ -288,21 +297,35 @@ func (pr *ProtoSheet) readData(sheet *xlsx.Sheet) {
 			rawRowData := pr.readRow(row)
 			if len(rawRowData) != 0 {
 				// Add Tag
-				pr.buf.EncodeVarint(uint64(10)) // (1 << 3) | 2 = 10
+				err := pr.buf.EncodeVarint(uint64(10)) // (1 << 3) | 2 = 10
+				if err != nil {
+					log.Fatal(err)
+				}
 				// Add contents
-				pr.buf.EncodeRawBytes(rawRowData)
+				err = pr.buf.EncodeRawBytes(rawRowData)
+				if err != nil {
+					log.Fatal(err)
+				}
 			}
 		}
 	}
+
+	pr.DataHash()
 }
 
 func (rp *Repeat) getCount(row *xlsx.Row) int {
+	// no repeat content
 	if rp.colIdx >= len(row.Cells) {
 		return 0
 	}
+	// not use
+	if strings.TrimSpace(row.Cells[rp.colIdx].Value) == "" {
+		return 0
+	}
+	// not number
 	valCount, err := row.Cells[rp.colIdx].Int()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err.Error())
+		log.Printf("convert %v to number fail, %v", row.Cells[rp.colIdx].Value, err)
 		return 0
 	}
 
@@ -312,13 +335,18 @@ func (rp *Repeat) getCount(row *xlsx.Row) int {
 // readRow Marshal a row of data into binary data
 func (pr *ProtoSheet) readRow(row *xlsx.Row) []byte {
 	rowBuff := proto.NewBuffer([]byte{})
+	var err error
 	for i, val := range pr.vars {
 		if val.colIdx == -1 { // sheet has no field
-			readCell(rowBuff, val, new(xlsx.Cell))
+			err = readCell(rowBuff, val, new(xlsx.Cell))
 		} else if i < len(row.Cells) && val.colIdx < len(row.Cells) {
-			readCell(rowBuff, val, row.Cells[val.colIdx]) // Variable part of data
+			err = readCell(rowBuff, val, row.Cells[val.colIdx]) // Variable part of data
 		} else { // sheet cell is empty
-			readCell(rowBuff, val, new(xlsx.Cell))
+			err = readCell(rowBuff, val, new(xlsx.Cell))
+		}
+
+		if err != nil {
+			log.Printf("readCell to val %+v failed, %v", val, err)
 		}
 	}
 
@@ -327,16 +355,25 @@ func (pr *ProtoSheet) readRow(row *xlsx.Row) []byte {
 			fieldBuff := proto.NewBuffer([]byte{})
 			for count := 0; count < rowCount; count++ {
 				fieldBuff.Reset()
-				rowBuff.EncodeVarint(uint64((repeat.fieldNum << 3) | 2)) // Add Repeat Tag
+				err := rowBuff.EncodeVarint(uint64((repeat.fieldNum << 3) | 2)) // Add Repeat Tag
+				if err != nil {
+					log.Fatal(err)
+				}
 				for _, val := range repeat.fields {
 					// if the rest of a row is blank
 					cell := new(xlsx.Cell)
 					if len(row.Cells) > val.colIdx+count*(repeat.fieldLength+1) {
 						cell = row.Cells[val.colIdx+count*(repeat.fieldLength+1)]
 					}
-					readCell(fieldBuff, val, cell) // next variable position = current position + field length + 1
+					err := readCell(fieldBuff, val, cell) // next variable position = current position + field length + 1
+					if err != nil {
+						log.Printf("readCell to repeat %+v val %+v failed, %v", repeat, val, err)
+					}
 				}
-				rowBuff.EncodeRawBytes(fieldBuff.Bytes())
+				err = rowBuff.EncodeRawBytes(fieldBuff.Bytes())
+				if err != nil {
+					log.Fatal(err)
+				}
 			}
 		}
 	}
@@ -345,51 +382,78 @@ func (pr *ProtoSheet) readRow(row *xlsx.Row) []byte {
 }
 
 // readCell add "Tag - Value" or "Tag - Length - Value" to buffer according to var type
-func readCell(b *proto.Buffer, val *Val, cell *xlsx.Cell) {
-	if cell.Value == "" {
-		return
+func readCell(b *proto.Buffer, val *Val, cell *xlsx.Cell) error {
+	if strings.TrimSpace(cell.Value) == "" {
+		return nil
 	}
 
 	switch val.typ {
 	case "int32", "int64", "uint32", "uint64":
-		b.EncodeVarint(uint64((val.fieldNum << 3) | proto.WireVarint))
+		err := b.EncodeVarint(uint64((val.fieldNum << 3) | proto.WireVarint))
+		if err != nil {
+			return err
+		}
 		intVal, err := cell.Int()
 		if err != nil {
-			fmt.Fprintln(os.Stderr, err.Error())
-			return
+			return err
 		}
-		b.EncodeVarint(uint64(intVal))
+		err = b.EncodeVarint(uint64(intVal))
+		if err != nil {
+			return err
+		}
 	case "sint32", "sint64":
-		b.EncodeVarint(uint64((val.fieldNum << 3) | proto.WireVarint))
+		err := b.EncodeVarint(uint64((val.fieldNum << 3) | proto.WireVarint))
+		if err != nil {
+			return err
+		}
 		intVal, err := cell.Int()
 		if err != nil {
-			fmt.Fprintln(os.Stderr, err.Error())
-			return
+			return err
 		}
-		b.EncodeZigzag64(uint64(intVal))
+		err = b.EncodeZigzag64(uint64(intVal))
+		if err != nil {
+			return err
+		}
 	case "float", "float32":
-		b.EncodeVarint(uint64((val.fieldNum << 3) | proto.WireFixed32))
+		err := b.EncodeVarint(uint64((val.fieldNum << 3) | proto.WireFixed32))
+		if err != nil {
+			return err
+		}
 		floatVal, err := cell.Float()
 		if err != nil {
-			fmt.Fprintln(os.Stderr, err.Error())
-			return
+			return err
 		}
-		b.EncodeFixed32(math.Float64bits(floatVal))
+		err = b.EncodeFixed32(math.Float64bits(floatVal))
+		if err != nil {
+			return err
+		}
 	case "float64":
-		b.EncodeVarint(uint64((val.fieldNum << 3) | proto.WireFixed64))
+		err := b.EncodeVarint(uint64((val.fieldNum << 3) | proto.WireFixed64))
+		if err != nil {
+			return err
+		}
 		floatVal, err := cell.Float()
 		if err != nil {
-			fmt.Fprintln(os.Stderr, err.Error())
-			return
+			return err
 		}
-		b.EncodeFixed64(uint64(math.Float32bits(float32(floatVal))))
+		err = b.EncodeFixed64(uint64(math.Float32bits(float32(floatVal))))
+		if err != nil {
+			return err
+		}
 	case "string":
-		b.EncodeVarint(uint64((val.fieldNum << 3) | proto.WireBytes))
-		b.EncodeStringBytes(cell.Value) // length included
+		err := b.EncodeVarint(uint64((val.fieldNum << 3) | proto.WireBytes)) // tag
+		if err != nil {
+			return err
+		}
+		err = b.EncodeStringBytes(cell.Value) // length included
+		if err != nil {
+			return err
+		}
 	default:
-		fmt.Fprintf(os.Stderr, "invalid var type: %v\n", val.typ)
-		return
+		return fmt.Errorf("invalid var type: %v\n", val.typ)
 	}
+
+	return nil
 }
 
 func (pr *ProtoSheet) WriteData() {
@@ -401,10 +465,23 @@ func (pr *ProtoSheet) WriteData() {
 	}
 
 	w := bufio.NewWriter(f)
-	w.Write(pr.buf.Bytes())
-	w.Flush()
+	_, err = w.Write(pr.buf.Bytes())
+	if err != nil {
+		panic(err)
+	}
+	err = w.Flush()
+	if err != nil {
+		panic(err)
+	}
 
 	if err := f.Close(); err != nil {
 		fmt.Println(err.Error())
 	}
+}
+
+// Hash generate hash of proto content
+func (pr *ProtoSheet) DataHash() {
+	hash := md5.New()
+	hash.Write(pr.buf.Bytes())
+	pr.dataHash = hash.Sum(nil)
 }
