@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 )
 
 var (
@@ -29,6 +30,8 @@ type Cacher struct {
 	XlsxInfos  map[string]*DataInfo `json:"xlsx_info"`
 	ProtoInfos map[string]*DataInfo `json:"proto_info"`
 	DataInfos  map[string]*DataInfo `json:"data_info"`
+
+	mutex sync.RWMutex `json:"-"`
 }
 
 // XlsxInfo contains sheet information in xlsx files

@@ -15,6 +15,7 @@ import (
 )
 
 // ProtoSheet is used to generate proto file
+// buf used to store data binary
 type ProtoSheet struct {
 	ProtoIn
 	ProtoOut
@@ -63,18 +64,18 @@ type Val struct {
 	typ             string
 	name            string
 	comment         string
-	fieldNum        int
+	fieldNum        int // proto index
 	defaultValueStr string
 }
 
 // Repeat contains repeat filed for .proto file
 type Repeat struct {
-	colIdx          int
+	colIdx          int // start position of column
 	maxLength       int
 	fieldName       string
 	fieldLength     int
-	fieldNum        int
-	repeatIdx       int
+	fieldNum        int // proto index
+	repeatIdx       int // proto repeat index
 	comment         string
 	fields          []*Val
 	defaultValueStr string
@@ -97,7 +98,10 @@ func newRepeat() *Repeat {
 	return rp
 }
 
+// ReadSheet Read data pair from *.config
 func ReadSheet(fileName, sheetName string) error {
+	fmt.Printf("reading %v for sheets %v\n", fileName, sheetName)
+
 	xlsxFullName := filepath.Join(cfg.XlsxPath, fileName+cfg.XlsxExt)
 	if _, err := os.Stat(xlsxFullName); os.IsNotExist(err) {
 		return fmt.Errorf("file %s does not exists", fileName)
@@ -125,6 +129,8 @@ func ReadSheet(fileName, sheetName string) error {
 		return err
 	}
 
+	fmt.Printf("done for %v for sheets %v\n", fileName, sheetName)
+
 	return nil
 }
 
@@ -142,7 +148,7 @@ func readSheets(filename string, sheets []*xlsx.Sheet) error {
 		pr.updateHeads(sheet)
 
 		// check if proto need update
-		// only hash
+		// only hash head which will be used to generate proto file
 		if !hasGenProto {
 			pr.GenProto()
 			pr.ProtoHash()
@@ -165,8 +171,6 @@ func readSheets(filename string, sheets []*xlsx.Sheet) error {
 		pr.WriteData()
 	}
 
-	// fmt.Printf("Done for %v ...\n", pr.Name)
-
 	return nil
 }
 
@@ -176,8 +180,6 @@ func (pr *ProtoSheet) updateHeads(sheet *xlsx.Sheet) {
 
 	var repeatLength, repeatStructLength int // These are counters for repeat structure
 	var curRepeat *Repeat
-
-	fmt.Printf("readHeads for %v ...\n", pr.Name)
 
 	for colIdx := 0; colIdx < sheet.MaxCol; colIdx++ {
 		headType := sheet.Cell(RowAttr, colIdx).Value
@@ -209,6 +211,8 @@ func (pr *ProtoSheet) updateHeads(sheet *xlsx.Sheet) {
 			} else {
 				// read repeat struct but avoid duplicate
 				if len(curRepeat.fields) != curRepeat.fieldLength {
+					val.fieldNum = curRepeat.repeatIdx
+					curRepeat.repeatIdx++
 					curRepeat.fields = append(curRepeat.fields, val)
 				}
 				// check if repeat ends
@@ -249,6 +253,7 @@ func (pr *ProtoSheet) updateHeads(sheet *xlsx.Sheet) {
 func (pr *ProtoSheet) updateVal(val *Val) {
 	if idx, ok := pr.fieldMap[val.name]; ok {
 		// update
+		val.fieldNum = pr.vars[idx].fieldNum // get proto index from previous val
 		pr.vars[idx] = val
 		if val.defaultValueStr != pr.vars[idx].defaultValueStr {
 			fmt.Printf("sheet %v variable %v default value %v differs from others %v\n",
@@ -259,20 +264,27 @@ func (pr *ProtoSheet) updateVal(val *Val) {
 		idx = len(pr.vars)
 		pr.vars = append(pr.vars, val)
 		pr.fieldMap[val.name] = idx
+		val.fieldNum = pr.varIdx
+		pr.varIdx++
 	}
 }
 
 // updateRepeat if a repeat has same optional struct name and maxLength as in ProtoSheet, update it, else add it
 func (pr *ProtoSheet) updateRepeat(repeat *Repeat) {
-	if idx, ok := pr.fieldMap[repeat.fieldName]; ok {
+	idx, ok := pr.fieldMap[repeat.fieldName]
+	if ok {
 		if repeat.maxLength == pr.repeats[idx].maxLength {
 			// update
+			repeat.fieldNum = pr.repeats[idx].fieldNum
 			pr.repeats[idx] = repeat
 		} else {
 			fmt.Printf("sheet %v repeat length %v is not equal as others %v\n", pr.Name, repeat.maxLength, pr.repeats[idx].maxLength)
+			return
 		}
 	} else {
 		// add
+		repeat.fieldNum = pr.varIdx // get proto index
+		pr.varIdx++
 		idx = len(pr.repeats)
 		pr.repeats = append(pr.repeats, repeat)
 		pr.fieldMap[repeat.fieldName] = idx

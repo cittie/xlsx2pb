@@ -85,7 +85,7 @@ func (pr *ProtoSheet) AddMessageHead(name string) {
 }
 
 // AddOneDefine add a proto defination
-func (pr *ProtoSheet) AddOneDefine(isRepeat bool, comment, p2type, typ, name, defaultValStr string, idx *int) {
+func (pr *ProtoSheet) AddOneDefine(isRepeat bool, comment, p2type, typ, name, defaultValStr string, idx int) {
 	defaultStr := fmt.Sprintf(" [default = %v]", defaultValStr)
 	if comment != "" {
 		pr.outProto = append(pr.outProto, fmt.Sprintf("%s/* %s */", curIndent, comment)) // comment
@@ -106,8 +106,7 @@ func (pr *ProtoSheet) AddOneDefine(isRepeat bool, comment, p2type, typ, name, de
 		typ = "repeated " + typ
 		defaultStr = ""
 	}
-	pr.outProto = append(pr.outProto, fmt.Sprintf("%s%s %s = %d%v;", curIndent, typ, name, *idx, defaultStr)) // define
-	*idx++
+	pr.outProto = append(pr.outProto, fmt.Sprintf("%s%s %s = %d%v;", curIndent, typ, name, idx, defaultStr)) // define
 }
 
 // AddMessageTail add a proto message tail
@@ -119,8 +118,7 @@ func (pr *ProtoSheet) AddMessageTail() {
 
 // AddVal add a proto variable define
 func (pr *ProtoSheet) AddVal(sh *Val) {
-	pr.AddOneDefine(false, sh.comment, sh.proto2Type, sh.typ, sh.name, sh.defaultValueStr, &pr.varIdx)
-	sh.fieldNum = pr.varIdx - 1
+	pr.AddOneDefine(false, sh.comment, sh.proto2Type, sh.typ, sh.name, sh.defaultValueStr, sh.fieldNum)
 }
 
 // AddRepeat add repeat struct
@@ -142,15 +140,13 @@ func (pr *ProtoSheet) AddRepeat(repeat *Repeat) {
 // AddRepeatDefine add repeat inner define
 func (pr *ProtoSheet) AddRepeatDefine(repeat *Repeat) {
 	for _, sh := range repeat.fields {
-		pr.AddOneDefine(false, sh.comment, sh.proto2Type, sh.typ, sh.name, sh.defaultValueStr, &repeat.repeatIdx)
-		sh.fieldNum = repeat.repeatIdx - 1
+		pr.AddOneDefine(false, sh.comment, sh.proto2Type, sh.typ, sh.name, sh.defaultValueStr, sh.fieldNum)
 	}
 }
 
 // AddRepeatTail add repeat declare
 func (pr *ProtoSheet) AddRepeatTail(repeat *Repeat) {
-	pr.AddOneDefine(true, repeat.fieldName, "", repeat.fieldName, repeat.comment, repeat.defaultValueStr, &pr.varIdx)
-	repeat.fieldNum = pr.varIdx - 1
+	pr.AddOneDefine(true, repeat.fieldName, "", repeat.fieldName, repeat.comment, repeat.defaultValueStr, repeat.fieldNum)
 }
 
 // AddMessageArray add an array for current message as XXX_ARRAY

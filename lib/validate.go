@@ -40,6 +40,10 @@ func IsXlsxChanged(filename string) bool {
 	}
 
 	fname := filepath.Join(cfg.XlsxPath, filename+cfg.XlsxExt)
+
+	cacher.mutex.Lock()
+	defer cacher.mutex.Unlock()
+
 	if fInfo, ok := cacher.XlsxInfos[filename]; ok {
 		fHash := getFileMD5(fname)
 		if string(fHash) == string(fInfo.MD5) {
@@ -77,6 +81,9 @@ func IsProtoChanged(ps *ProtoSheet) bool {
 		return true
 	}
 
+	cacher.mutex.Lock()
+	defer cacher.mutex.Unlock()
+
 	if info, ok := cacher.ProtoInfos[ps.Name]; ok {
 		if string(info.MD5) == string(ps.protoHash) {
 			info.State = Remained
@@ -101,6 +108,9 @@ func IsDataChanged(ps *ProtoSheet) bool {
 	if cacher == nil {
 		return true
 	}
+
+	cacher.mutex.Lock()
+	defer cacher.mutex.Unlock()
 
 	if info, ok := cacher.DataInfos[ps.Name]; ok {
 		if string(info.MD5) == string(ps.dataHash) {

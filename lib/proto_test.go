@@ -20,6 +20,7 @@ func genTestProtoRow() *ProtoSheet {
 		name:            "TestField1",
 		comment:         "* This is TestFiled1 *",
 		defaultValueStr: `"default"`,
+		fieldNum:        1,
 	}
 
 	// Repeat Field
@@ -30,6 +31,7 @@ func genTestProtoRow() *ProtoSheet {
 		name:            "TestRepeat1",
 		comment:         "** This is TestRepeat1 **",
 		defaultValueStr: "0",
+		fieldNum:        1,
 	}
 
 	pr.vars = append(pr.vars, sh)
@@ -41,6 +43,7 @@ func genTestProtoRow() *ProtoSheet {
 		fieldLength:     1,
 		repeatIdx:       1,
 		defaultValueStr: `""`,
+		fieldNum:        2,
 	}
 
 	rp.fields = append(rp.fields, sh2)
