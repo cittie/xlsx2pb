@@ -96,7 +96,10 @@ func (pr *ProtoSheet) AddOneDefine(isRepeat bool, comment, p2type, typ, name, de
 			name = defaultStructureName
 		}
 	}
-	if typ == "float" || typ == "float64" { // convert go varient name to proto varient name
+	if typ == "float32" { // convert go varient name to proto varient name
+		typ = "float"
+	}
+	if typ == "float64" { // convert go varient name to proto varient name
 		typ = "double"
 	}
 	if !pr.isProto3 && p2type != "" { // only for proto2

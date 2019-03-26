@@ -442,7 +442,7 @@ func readCell(b *proto.Buffer, val *Val, cell *xlsx.Cell) error {
 		if err != nil {
 			return err
 		}
-	case "float64":
+	case "float64", "double":
 		err := b.EncodeVarint(uint64((val.fieldNum << 3) | proto.WireFixed64))
 		if err != nil {
 			return err

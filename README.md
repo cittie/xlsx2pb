@@ -38,6 +38,7 @@ Use following param to turn off cache:
 * float(float32)
 * float32
 * float64
+* double(float64)
 * int32
 * int64
 * uint32
