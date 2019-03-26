@@ -68,7 +68,7 @@ type Val struct {
 	defaultValueStr string
 }
 
-// Repeat contains repeat filed for .proto file
+// Repeat contains repeat fields for .proto file
 type Repeat struct {
 	colIdx          int // start position of column
 	maxLength       int
@@ -94,6 +94,7 @@ func newProtoRow() *ProtoSheet {
 func newRepeat() *Repeat {
 	rp := new(Repeat)
 	rp.repeatIdx = 1
+	rp.fieldLength = 1 // for repeat without optional struct
 
 	return rp
 }
@@ -213,15 +214,21 @@ func (pr *ProtoSheet) updateHeads(sheet *xlsx.Sheet) {
 				pr.updateVal(val)
 			} else {
 				// read repeat struct but avoid duplicate
-				if len(curRepeat.fields) != curRepeat.fieldLength {
+				if len(curRepeat.fields) < curRepeat.fieldLength {
 					val.fieldNum = curRepeat.repeatIdx
 					curRepeat.repeatIdx++
 					curRepeat.fields = append(curRepeat.fields, val)
 				}
+
 				// check if repeat ends
 				repeatStructLength--
-				if repeatStructLength == 0 {
+				if repeatStructLength <= 0 {
 					repeatLength--
+				}
+
+				if repeatLength == 0 {
+					pr.updateRepeat(curRepeat)
+					curRepeat = nil
 				}
 			}
 		case Rep:
@@ -246,10 +253,17 @@ func (pr *ProtoSheet) updateHeads(sheet *xlsx.Sheet) {
 				curRepeat.fieldLength, _ = sheet.Cell(RowType, colIdx).Int()
 				curRepeat.fieldName = sheet.Cell(RowID, colIdx).Value
 				curRepeat.comment = sheet.Cell(RowComment, colIdx).Value
-				pr.updateRepeat(curRepeat)
 			}
 		}
 	}
+
+	// sometimes people will not full fill all repeat structs they designed...
+	if curRepeat != nil {
+		pr.updateRepeat(curRepeat)
+		curRepeat = nil
+	}
+
+	pr.updateRepeatWithoutStrut()
 }
 
 // updateVal if a variable is already in ProtoSheet, update its value, else add it
@@ -274,7 +288,18 @@ func (pr *ProtoSheet) updateVal(val *Val) {
 
 // updateRepeat if a repeat has same optional struct name and maxLength as in ProtoSheet, update it, else add it
 func (pr *ProtoSheet) updateRepeat(repeat *Repeat) {
-	idx, ok := pr.fieldMap[repeat.fieldName]
+	fieldName := repeat.fieldName
+	if fieldName == "" {
+		if len(repeat.fields) != 0 {
+			fieldName = repeat.fields[0].name
+		}
+	}
+
+	if fieldName == "" {
+		return
+	}
+
+	idx, ok := pr.fieldMap[fieldName]
 	if ok {
 		if repeat.maxLength == pr.repeats[idx].maxLength {
 			// update
@@ -290,7 +315,17 @@ func (pr *ProtoSheet) updateRepeat(repeat *Repeat) {
 		pr.varIdx++
 		idx = len(pr.repeats)
 		pr.repeats = append(pr.repeats, repeat)
-		pr.fieldMap[repeat.fieldName] = idx
+		pr.fieldMap[fieldName] = idx
+	}
+}
+
+func (pr *ProtoSheet) updateRepeatWithoutStrut() {
+	for _, repeat := range pr.repeats {
+		if repeat.fieldName == "" {
+			for _, val := range repeat.fields {
+				val.fieldNum = repeat.fieldNum
+			}
+		}
 	}
 }
 
@@ -367,27 +402,50 @@ func (pr *ProtoSheet) readRow(row *xlsx.Row) []byte {
 
 	for _, repeat := range pr.repeats {
 		if rowCount := repeat.getCount(row); rowCount > 0 {
-			fieldBuff := proto.NewBuffer([]byte{})
-			for count := 0; count < rowCount; count++ {
-				fieldBuff.Reset()
-				err := rowBuff.EncodeVarint(uint64((repeat.fieldNum << 3) | 2)) // Add Repeat Tag
-				if err != nil {
-					log.Fatal(err)
-				}
-				for _, val := range repeat.fields {
-					// if the rest of a row is blank
-					cell := new(xlsx.Cell)
-					if len(row.Cells) > val.colIdx+count*(repeat.fieldLength+1) {
-						cell = row.Cells[val.colIdx+count*(repeat.fieldLength+1)]
+			// repeat with struct, [RepeatTag][Tag1][Value1][Tag2]Value2]...
+			if repeat.fieldName != "" {
+				fieldBuff := proto.NewBuffer([]byte{})
+				for count := 0; count < rowCount; count++ {
+					fieldBuff.Reset()
+
+					err := rowBuff.EncodeVarint(uint64((repeat.fieldNum << 3) | 2)) // Add Repeat Tag
+					if err != nil {
+						log.Fatal(err)
 					}
-					err := readCell(fieldBuff, val, cell) // next variable position = current position + field length + 1
+					for _, val := range repeat.fields {
+						// if the rest of a row is blank
+						cell := new(xlsx.Cell)
+						if len(row.Cells) > val.colIdx+count*(repeat.fieldLength+1) {
+							cell = row.Cells[val.colIdx+count*(repeat.fieldLength+1)]
+						}
+						err := readCell(fieldBuff, val, cell) // next variable position = current position + field length + 1
+						if err != nil {
+							log.Printf("readCell to repeat %+v val %+v failed, %v", repeat, val, err)
+						}
+					}
+
+					err = rowBuff.EncodeRawBytes(fieldBuff.Bytes())
+					if err != nil {
+						log.Fatal(err)
+					}
+				}
+			} else { // repeat without struct [Tag][Value][Tag][Value]...
+				if len(repeat.fields) == 0 {
+					continue
+				}
+
+				val := repeat.fields[0]
+
+				for count := 0; count < rowCount; count++ {
+					cell := new(xlsx.Cell)
+					if len(row.Cells) > val.colIdx+count {
+						cell = row.Cells[val.colIdx+count]
+					}
+
+					err := readCell(rowBuff, val, cell) // next variable position = current position + field length + 1
 					if err != nil {
 						log.Printf("readCell to repeat %+v val %+v failed, %v", repeat, val, err)
 					}
-				}
-				err = rowBuff.EncodeRawBytes(fieldBuff.Bytes())
-				if err != nil {
-					log.Fatal(err)
 				}
 			}
 		}

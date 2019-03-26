@@ -80,6 +80,9 @@ func (pr *ProtoSheet) AddPreHead() {
 
 // AddMessageHead add a proto message head
 func (pr *ProtoSheet) AddMessageHead(name string) {
+	if name == "" {
+		return
+	}
 	pr.outProto = append(pr.outProto, fmt.Sprintf("%smessage %s {", curIndent, name))
 	pr.IncreaseIndent()
 }
@@ -127,14 +130,17 @@ func (pr *ProtoSheet) AddVal(sh *Val) {
 // AddRepeat add repeat struct
 func (pr *ProtoSheet) AddRepeat(repeat *Repeat) {
 	pr.AddOneEmptyLine()
-	// Add message head
-	pr.AddMessageHead(repeat.fieldName)
 
-	// Add repeat vals
-	pr.AddRepeatDefine(repeat)
+	if repeat.fieldName != "" {
+		// Add message head
+		pr.AddMessageHead(repeat.fieldName)
 
-	// Add message tail
-	pr.AddMessageTail()
+		// Add repeat vals
+		pr.AddRepeatDefine(repeat)
+
+		// Add message tail
+		pr.AddMessageTail()
+	}
 
 	// Add repeat tail
 	pr.AddRepeatTail(repeat)
@@ -142,6 +148,10 @@ func (pr *ProtoSheet) AddRepeat(repeat *Repeat) {
 
 // AddRepeatDefine add repeat inner define
 func (pr *ProtoSheet) AddRepeatDefine(repeat *Repeat) {
+	if repeat.fieldName == "" {
+		return
+	}
+
 	for _, sh := range repeat.fields {
 		pr.AddOneDefine(false, sh.comment, sh.proto2Type, sh.typ, sh.name, sh.defaultValueStr, sh.fieldNum)
 	}
@@ -149,7 +159,14 @@ func (pr *ProtoSheet) AddRepeatDefine(repeat *Repeat) {
 
 // AddRepeatTail add repeat declare
 func (pr *ProtoSheet) AddRepeatTail(repeat *Repeat) {
-	pr.AddOneDefine(true, repeat.fieldName, "", repeat.fieldName, repeat.comment, repeat.defaultValueStr, repeat.fieldNum)
+	if repeat.fieldName != "" {
+		pr.AddOneDefine(true, repeat.fieldName, "", repeat.fieldName, repeat.comment, repeat.defaultValueStr, repeat.fieldNum)
+	} else {
+		if len(repeat.fields) != 0 {
+			val := repeat.fields[0]
+			pr.AddOneDefine(true, val.comment, "", val.typ, val.name, "", repeat.fieldNum)
+		}
+	}
 }
 
 // AddMessageArray add an array for current message as XXX_ARRAY
