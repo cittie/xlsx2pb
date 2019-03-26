@@ -139,6 +139,11 @@ func readSheets(filename string, sheets []*xlsx.Sheet) error {
 
 	hasGenProto := false
 
+	// use filename instead of sheet name if sheets are more than 1
+	if len(sheets) > 1 {
+		pr.Name = strings.TrimSpace(strings.TrimSuffix(filename, ".xlsx"))
+	}
+
 	for _, sheet := range sheets {
 		if sheet.MaxRow < RowData {
 			return fmt.Errorf("sheet %v contains no data", sheet)
@@ -158,11 +163,6 @@ func readSheets(filename string, sheets []*xlsx.Sheet) error {
 		pr.readData(sheet)
 	}
 
-	// use filename instead of sheet name if sheets are more than 1
-	if len(sheets) > 1 {
-		pr.Name = strings.TrimSpace(strings.TrimSuffix(filename, ".xlsx"))
-	}
-
 	if IsProtoChanged(pr) {
 		pr.WriteProto()
 	}
@@ -175,7 +175,10 @@ func readSheets(filename string, sheets []*xlsx.Sheet) error {
 }
 
 func (pr *ProtoSheet) updateHeads(sheet *xlsx.Sheet) {
-	pr.Name = strings.TrimSpace(sheet.Name)
+	if pr.Name == "" {
+		pr.Name = strings.TrimSpace(sheet.Name)
+	}
+
 	pr.resetAllIndex() // clear previous sheet data
 
 	var repeatLength, repeatStructLength int // These are counters for repeat structure
