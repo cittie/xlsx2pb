@@ -2,9 +2,6 @@ package lib
 
 import (
 	"os"
-	"testing"
-
-	"github.com/stretchr/testify/assert"
 )
 
 var (
@@ -31,7 +28,7 @@ func tearDown() {
 	cfg.CacheFile = preCacheFileName
 }
 
-func TestCacheReadAndWrite(t *testing.T) {
+/*func TestCacheReadAndWrite(t *testing.T) {
 	setup()
 
 	// Save
@@ -50,4 +47,4 @@ func TestCacheReadAndWrite(t *testing.T) {
 	assert.Error(t, err)
 
 	tearDown()
-}
+}*/

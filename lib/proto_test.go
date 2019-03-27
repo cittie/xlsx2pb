@@ -2,7 +2,6 @@ package lib
 
 import (
 	"encoding/hex"
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -78,15 +77,16 @@ func genTestProtoRow() *ProtoSheet {
 	return pr
 }
 
-func TestProtoSheet_GenProto(t *testing.T) {
+/*func TestProtoSheet_GenProto(t *testing.T) {
 	pr := genTestProtoRow()
+	pr.isProto3 = true
 
 	pr.GenProto()
 
 	for _, line := range pr.outProto {
 		fmt.Println(line)
 	}
-}
+}*/
 
 func TestAddMessageProto2(t *testing.T) {
 	pr := genTestProtoRow()
@@ -109,15 +109,28 @@ func TestAddMessageProto2(t *testing.T) {
 	checkOutput("  /* * This is TestFiled1 * */")
 	checkOutput("  optional string TestField1 = 1 [default = \"default\"];")
 
-	pr.AddRepeat(pr.repeats[0])
+	pr.AddOptionalStruct(pr.optStructs[0])
 	checkOutput("  ")
-	checkOutput("  message TestRepeatStruct {")
-	checkOutput("    /* ** This is TestRepeat1 ** */")
-	checkOutput("    optional int64 TestRepeat1 = 1 [default = 0];")
+	checkOutput("  message TestOptStruct {")
+	checkOutput("    /* * This is TestFiled1 * */")
+	checkOutput("    optional string TestField1 = 1 [default = \"default\"];")
 	checkOutput("  }")
 	checkOutput("  ")
-	checkOutput("  /* TestRepeatStruct */")
-	checkOutput("  repeated TestRepeatStruct testrepeatstructs = 2;")
+	checkOutput("  optional TestOptStruct TestOptStructData = 3;")
+
+	pr.AddRepeat(pr.repeats[0])
+	checkOutput("  ")
+	checkOutput("  /* ** This is TestRepeat1 ** */")
+	checkOutput("  repeated int64 TestRepeat1 = 2;")
+
+	pr.AddRepeat(pr.repeats[1])
+	checkOutput("  ")
+	checkOutput("  message TestOptStruct {")
+	checkOutput("    /* * This is TestFiled1 * */")
+	checkOutput("    optional string TestField1 = 1 [default = \"default\"];")
+	checkOutput("  }")
+	checkOutput("  ")
+	checkOutput("  repeated TestRepeatStruct TestRepeatStructData = 2;")
 
 	pr.AddMessageTail()
 	checkOutput("}")
@@ -152,15 +165,28 @@ func TestAddMessageProto3(t *testing.T) {
 	checkOutput("  /* * This is TestFiled1 * */")
 	checkOutput("  string TestField1 = 1 [default = \"default\"];")
 
-	pr.AddRepeat(pr.repeats[0])
+	pr.AddOptionalStruct(pr.optStructs[0])
 	checkOutput("  ")
-	checkOutput("  message TestRepeatStruct {")
-	checkOutput("    /* ** This is TestRepeat1 ** */")
-	checkOutput("    int64 TestRepeat1 = 1 [default = 0];")
+	checkOutput("  message TestOptStruct {")
+	checkOutput("    /* * This is TestFiled1 * */")
+	checkOutput("    string TestField1 = 1 [default = \"default\"];")
 	checkOutput("  }")
 	checkOutput("  ")
-	checkOutput("  /* TestRepeatStruct */")
-	checkOutput("  repeated TestRepeatStruct testrepeatstructs = 2;")
+	checkOutput("  TestOptStruct TestOptStructData = 3;")
+
+	pr.AddRepeat(pr.repeats[0])
+	checkOutput("  ")
+	checkOutput("  /* ** This is TestRepeat1 ** */")
+	checkOutput("  repeated int64 TestRepeat1 = 2;")
+
+	pr.AddRepeat(pr.repeats[1])
+	checkOutput("  ")
+	checkOutput("  message TestOptStruct {")
+	checkOutput("    /* * This is TestFiled1 * */")
+	checkOutput("    string TestField1 = 1 [default = \"default\"];")
+	checkOutput("  }")
+	checkOutput("  ")
+	checkOutput("  repeated TestRepeatStruct TestRepeatStructData = 2;")
 
 	pr.AddMessageTail()
 	checkOutput("}")
@@ -178,5 +204,5 @@ func TestHash(t *testing.T) {
 	pr.GenProto()
 	pr.ProtoHash()
 
-	assert.Equal(t, "9dcd1a127603012b57f5f41681660392", hex.EncodeToString(pr.protoHash[:]))
+	assert.Equal(t, "a00323db48cda8b383f8d3f3c284e37c", hex.EncodeToString(pr.protoHash[:]))
 }
