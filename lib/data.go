@@ -466,20 +466,20 @@ func (pr *ProtoSheet) readRow(row *xlsx.Row) []byte {
 	rowBuff := proto.NewBuffer([]byte{})
 	var err error
 
-	readval := func(idx int, val *Val) error {
+	readval := func(idx int, val *Val, b *proto.Buffer) error {
 		var e error
 		if val.colIdx == -1 { // sheet has no field
-			e = readCell(rowBuff, val, new(xlsx.Cell))
+			e = readCell(b, val, new(xlsx.Cell))
 		} else if val.colIdx < len(row.Cells) {
-			e = readCell(rowBuff, val, row.Cells[val.colIdx]) // Variable part of data
+			e = readCell(b, val, row.Cells[val.colIdx]) // Variable part of data
 		} else { // sheet cell is empty
-			e = readCell(rowBuff, val, new(xlsx.Cell))
+			e = readCell(b, val, new(xlsx.Cell))
 		}
 		return e
 	}
 
 	for i, val := range pr.vars {
-		err = readval(i, val)
+		err = readval(i, val, rowBuff)
 		if err != nil {
 			log.Printf("readCell to val %+v failed, %v", val, err)
 		}
@@ -493,11 +493,17 @@ func (pr *ProtoSheet) readRow(row *xlsx.Row) []byte {
 		}
 
 		// vals
+		fieldBuff := proto.NewBuffer([]byte{})
 		for i, val := range optS.fields {
-			err = readval(i, val)
+			err = readval(i, val, fieldBuff)
 			if err != nil {
 				log.Printf("readCell to val %v in opt struct %+v failed, %v", val, optS, err)
 			}
+		}
+
+		err = rowBuff.EncodeRawBytes(fieldBuff.Bytes())
+		if err != nil {
+			log.Fatal(err)
 		}
 	}
 
