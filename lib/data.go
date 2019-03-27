@@ -248,7 +248,7 @@ func (pr *ProtoSheet) updateHeads(sheet *xlsx.Sheet) {
 							curRepeat = nil
 						}
 					} else {
-						fmt.Printf("%v col %v curOptS %+v\n", pr.Name, colIdx, curOptS)
+						// fmt.Printf("%v col %v curOptS %+v\n", pr.Name, colIdx, curOptS)
 						pr.updateOptStruct(curOptS)
 					}
 
@@ -294,7 +294,14 @@ func (pr *ProtoSheet) updateHeads(sheet *xlsx.Sheet) {
 		curRepeat = nil
 	}
 
-	// fmt.Printf("pr %+v", pr)
+	/*
+		// Debug
+		fmt.Printf("sheetName %v\n", sheet.Name)
+		for _, val := range pr.vars {
+			fmt.Printf("val %+v\n", val)
+		}
+		fmt.Printf("--------------------------")
+	*/
 }
 
 // updateVal if a variable is already in ProtoSheet, update its value, else add it
@@ -463,7 +470,7 @@ func (pr *ProtoSheet) readRow(row *xlsx.Row) []byte {
 		var e error
 		if val.colIdx == -1 { // sheet has no field
 			e = readCell(rowBuff, val, new(xlsx.Cell))
-		} else if idx < len(row.Cells) && val.colIdx < len(row.Cells) {
+		} else if val.colIdx < len(row.Cells) {
 			e = readCell(rowBuff, val, row.Cells[val.colIdx]) // Variable part of data
 		} else { // sheet cell is empty
 			e = readCell(rowBuff, val, new(xlsx.Cell))

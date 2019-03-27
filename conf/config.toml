@@ -1,7 +1,7 @@
 [Config]
 # Avoid using "~" or "$GOPATH" in path
 # "." or ".." is acceptable but may cause problems
-xlsx_path = "/Users/jiangyi/data/data/a3k/"
+xlsx_path = "/Users/jiangyi/data/threekingdoms-data/a3k/"
 
 # Regular Expression of config files
 config_reg_exp = "xlsx*.config"
