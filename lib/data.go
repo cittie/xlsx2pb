@@ -24,11 +24,12 @@ type ProtoSheet struct {
 
 // ProtoIn contains data read from xlsx
 type ProtoIn struct {
-	Name     string
-	vars     []*Val
-	repeats  []*Repeat
-	dataHash []byte
-	fieldMap map[string]int // map[fieldName]index in vars/repeats
+	Name       string
+	vars       []*Val
+	repeats    []*Repeat
+	optStructs []*OptStruct
+	dataHash   []byte
+	fieldMap   map[string]int // map[fieldName]index in vars/opt structs/repeats
 }
 
 // ProtoOut controls how to output proto file
@@ -59,26 +60,35 @@ const (
 
 // Val contains fields for .proto file
 type Val struct {
-	colIdx          int
+	CommonInfo
 	proto2Type      string
 	typ             string
-	name            string
-	comment         string
-	fieldNum        int // proto index
 	defaultValueStr string
+}
+
+// OptStruct is a struct contains one or more variants
+type OptStruct struct {
+	CommonInfo
+	messageIdx int // proto message index
+	fields     []*Val
 }
 
 // Repeat contains repeat fields for .proto file
 type Repeat struct {
-	colIdx          int // start position of column
-	maxLength       int
-	fieldName       string
-	fieldLength     int
-	fieldNum        int // proto index
-	repeatIdx       int // proto repeat index
-	comment         string
-	fields          []*Val
-	defaultValueStr string
+	CommonInfo
+	repeatIdx int // proto repeat index
+	val       *Val
+	opts      *OptStruct
+}
+
+// CommonInfo is common info for val, opt struct and repeat
+type CommonInfo struct {
+	name      string
+	comment   string
+	colIdx    int // position of column
+	fieldNum  int // proto index
+	curLength int // use for counter
+	maxLength int // use for proto define
 }
 
 func newProtoRow() *ProtoSheet {
@@ -94,9 +104,15 @@ func newProtoRow() *ProtoSheet {
 func newRepeat() *Repeat {
 	rp := new(Repeat)
 	rp.repeatIdx = 1
-	rp.fieldLength = 1 // for repeat without optional struct
 
 	return rp
+}
+
+func newOptStruct() *OptStruct {
+	optS := new(OptStruct)
+	optS.messageIdx = 1
+
+	return optS
 }
 
 // ReadSheet Read data pair from *.config
@@ -182,8 +198,8 @@ func (pr *ProtoSheet) updateHeads(sheet *xlsx.Sheet) {
 
 	pr.resetAllIndex() // clear previous sheet data
 
-	var repeatLength, repeatStructLength int // These are counters for repeat structure
 	var curRepeat *Repeat
+	var curOptS *OptStruct
 
 	for colIdx := 0; colIdx < sheet.MaxCol; colIdx++ {
 		headType := sheet.Cell(RowAttr, colIdx).Value
@@ -210,50 +226,65 @@ func (pr *ProtoSheet) updateHeads(sheet *xlsx.Sheet) {
 			}
 			val.comment = sheet.Cell(RowComment, colIdx).Value
 
-			if repeatLength == 0 {
-				pr.updateVal(val)
-			} else {
-				// read repeat struct but avoid duplicate
-				if len(curRepeat.fields) < curRepeat.fieldLength {
-					val.fieldNum = curRepeat.repeatIdx
-					curRepeat.repeatIdx++
-					curRepeat.fields = append(curRepeat.fields, val)
+			switch {
+			case curOptS != nil: // Check opts
+				if len(curOptS.fields) < curOptS.maxLength {
+					val.fieldNum = curOptS.messageIdx
+					curOptS.messageIdx++
+					curOptS.fields = append(curOptS.fields, val)
 				}
 
-				// check if repeat ends
-				repeatStructLength--
-				if repeatStructLength <= 0 {
-					repeatLength--
+				curOptS.curLength--
+				if curOptS.curLength <= 0 {
+					if curRepeat != nil {
+						// TODO: check if all OptS are the same
+						if curRepeat.opts == nil {
+							curRepeat.opts = curOptS
+						}
+						curRepeat.curLength--
+
+						if curRepeat.curLength <= 0 {
+							pr.updateRepeat(curRepeat)
+							curRepeat = nil
+						}
+					} else {
+						fmt.Printf("%v col %v curOptS %+v\n", pr.Name, colIdx, curOptS)
+						pr.updateOptStruct(curOptS)
+					}
+
+					curOptS = nil
+				}
+			case curRepeat != nil && curOptS == nil: // Check repeat variant
+				if curRepeat.opts != nil {
+					log.Fatal("sheet struct invalid")
+					return
 				}
 
-				if repeatLength == 0 {
+				if curRepeat.val == nil {
+					curRepeat.val = val
+				}
+
+				curRepeat.curLength--
+
+				if curRepeat.curLength <= 0 {
 					pr.updateRepeat(curRepeat)
 					curRepeat = nil
 				}
+			default: // update val
+				pr.updateVal(val)
 			}
 		case Rep:
-			rp := newRepeat()
-			rp.colIdx = colIdx
-			repeatLength, _ = sheet.Cell(RowType, colIdx).Int()
-			rp.maxLength = repeatLength
-			curRepeat = rp
+			curRepeat = newRepeat()
+			curRepeat.colIdx = colIdx
+			curRepeat.maxLength, _ = sheet.Cell(RowType, colIdx).Int()
+			curRepeat.curLength = curRepeat.maxLength
 		case OptStru:
-			// struct length counter
-			repeatStructLength, _ = sheet.Cell(RowType, colIdx).Int()
-
-			// avoid optional_struct before repeat
-			if curRepeat == nil {
-				fmt.Printf("sheet %v col %v found optional struct without repeat\n", pr.Name, colIdx)
-				repeatStructLength = 0
-				continue
-			}
-
-			// init struct
-			if curRepeat.maxLength == repeatLength {
-				curRepeat.fieldLength, _ = sheet.Cell(RowType, colIdx).Int()
-				curRepeat.fieldName = sheet.Cell(RowID, colIdx).Value
-				curRepeat.comment = sheet.Cell(RowComment, colIdx).Value
-			}
+			curOptS = newOptStruct()
+			curOptS.colIdx = colIdx
+			curOptS.name = sheet.Cell(RowID, colIdx).Value
+			curOptS.comment = sheet.Cell(RowComment, colIdx).Value
+			curOptS.maxLength, _ = sheet.Cell(RowType, colIdx).Int()
+			curOptS.curLength = curOptS.maxLength
 		}
 	}
 
@@ -263,11 +294,16 @@ func (pr *ProtoSheet) updateHeads(sheet *xlsx.Sheet) {
 		curRepeat = nil
 	}
 
-	pr.updateRepeatWithoutStrut()
+	// fmt.Printf("pr %+v", pr)
 }
 
 // updateVal if a variable is already in ProtoSheet, update its value, else add it
 func (pr *ProtoSheet) updateVal(val *Val) {
+	if val.name == "" {
+		log.Printf("val %+v without name\n", val)
+		return
+	}
+
 	if idx, ok := pr.fieldMap[val.name]; ok {
 		// update
 		val.fieldNum = pr.vars[idx].fieldNum // get proto index from previous val
@@ -286,46 +322,75 @@ func (pr *ProtoSheet) updateVal(val *Val) {
 	}
 }
 
-// updateRepeat if a repeat has same optional struct name and maxLength as in ProtoSheet, update it, else add it
-func (pr *ProtoSheet) updateRepeat(repeat *Repeat) {
-	fieldName := repeat.fieldName
-	if fieldName == "" {
-		if len(repeat.fields) != 0 {
-			fieldName = repeat.fields[0].name
-		}
+func (pr *ProtoSheet) updateOptStruct(optS *OptStruct) {
+	if optS == nil {
+		log.Printf("optional struct %+v nil\n", optS)
+		return
 	}
-
-	if fieldName == "" {
+	if optS.name == "" {
+		log.Printf("optional struct %+v without name\n", optS)
 		return
 	}
 
-	idx, ok := pr.fieldMap[fieldName]
+	idx, ok := pr.fieldMap[optS.name]
+	if ok {
+		// check if they are same opt struct
+		if optS.maxLength == pr.optStructs[idx].maxLength {
+			optS.fieldNum = pr.optStructs[idx].fieldNum
+			pr.optStructs[idx] = optS
+		} else {
+			fmt.Printf("sheet %v opt struct length %v is not equal as others %v\n",
+				pr.Name, optS.maxLength, pr.optStructs[idx].maxLength)
+			return
+		}
+	} else {
+		optS.fieldNum = pr.varIdx
+		pr.varIdx++
+		newIdx := len(pr.optStructs)
+		pr.optStructs = append(pr.optStructs, optS)
+		pr.fieldMap[optS.name] = newIdx
+	}
+}
+
+// updateRepeat if a repeat has same optional struct name and maxLength as in ProtoSheet, update it, else add it
+func (pr *ProtoSheet) updateRepeat(repeat *Repeat) {
+	if repeat.opts != nil {
+		repeat.name = repeat.opts.name
+		repeat.comment = repeat.opts.comment
+	} else if repeat.val != nil {
+		repeat.name = repeat.val.name
+	} else {
+		log.Printf("[updateRepeat] empty repeat\n")
+		return
+	}
+
+	if repeat.name == "" {
+		log.Printf("[updateRepeat] empty repeat name from val or opt struct/n")
+		return
+	}
+
+	idx, ok := pr.fieldMap[repeat.name]
 	if ok {
 		if repeat.maxLength == pr.repeats[idx].maxLength {
 			// update
 			repeat.fieldNum = pr.repeats[idx].fieldNum
 			pr.repeats[idx] = repeat
 		} else {
-			fmt.Printf("sheet %v repeat length %v is not equal as others %v\n", pr.Name, repeat.maxLength, pr.repeats[idx].maxLength)
+			fmt.Printf("sheet %v repeat length %v is not equal as others %v\n",
+				pr.Name, repeat.maxLength, pr.repeats[idx].maxLength)
 			return
 		}
 	} else {
 		// add
 		repeat.fieldNum = pr.varIdx // get proto index
 		pr.varIdx++
-		idx = len(pr.repeats)
+		newIdx := len(pr.repeats)
 		pr.repeats = append(pr.repeats, repeat)
-		pr.fieldMap[fieldName] = idx
+		pr.fieldMap[repeat.name] = newIdx
 	}
-}
 
-func (pr *ProtoSheet) updateRepeatWithoutStrut() {
-	for _, repeat := range pr.repeats {
-		if repeat.fieldName == "" {
-			for _, val := range repeat.fields {
-				val.fieldNum = repeat.fieldNum
-			}
-		}
+	if repeat.val != nil {
+		repeat.val.fieldNum = repeat.fieldNum
 	}
 }
 
@@ -334,9 +399,16 @@ func (pr *ProtoSheet) resetAllIndex() {
 	for _, val := range pr.vars {
 		val.colIdx = -1
 	}
-	for _, rp := range pr.repeats {
-		for _, val := range rp.fields {
+	for _, optS := range pr.optStructs {
+		optS.colIdx = -1
+		for _, val := range optS.fields {
 			val.colIdx = -1
+		}
+	}
+	for _, rp := range pr.repeats {
+		rp.colIdx = -1
+		if rp.val != nil {
+			rp.val.colIdx = -1
 		}
 	}
 }
@@ -386,24 +458,50 @@ func (rp *Repeat) getCount(row *xlsx.Row) int {
 func (pr *ProtoSheet) readRow(row *xlsx.Row) []byte {
 	rowBuff := proto.NewBuffer([]byte{})
 	var err error
-	for i, val := range pr.vars {
-		if val.colIdx == -1 { // sheet has no field
-			err = readCell(rowBuff, val, new(xlsx.Cell))
-		} else if i < len(row.Cells) && val.colIdx < len(row.Cells) {
-			err = readCell(rowBuff, val, row.Cells[val.colIdx]) // Variable part of data
-		} else { // sheet cell is empty
-			err = readCell(rowBuff, val, new(xlsx.Cell))
-		}
 
+	readval := func(idx int, val *Val) error {
+		var e error
+		if val.colIdx == -1 { // sheet has no field
+			e = readCell(rowBuff, val, new(xlsx.Cell))
+		} else if idx < len(row.Cells) && val.colIdx < len(row.Cells) {
+			e = readCell(rowBuff, val, row.Cells[val.colIdx]) // Variable part of data
+		} else { // sheet cell is empty
+			e = readCell(rowBuff, val, new(xlsx.Cell))
+		}
+		return e
+	}
+
+	for i, val := range pr.vars {
+		err = readval(i, val)
 		if err != nil {
 			log.Printf("readCell to val %+v failed, %v", val, err)
 		}
 	}
 
+	for _, optS := range pr.optStructs {
+		// Tag
+		err := rowBuff.EncodeVarint(uint64((optS.fieldNum << 3) | 2)) // Add Repeat Tag
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		// vals
+		for i, val := range optS.fields {
+			err = readval(i, val)
+			if err != nil {
+				log.Printf("readCell to val %v in opt struct %+v failed, %v", val, optS, err)
+			}
+		}
+	}
+
 	for _, repeat := range pr.repeats {
+		if repeat.colIdx == -1 {
+			continue
+		}
+		// read the value of copy number
 		if rowCount := repeat.getCount(row); rowCount > 0 {
 			// repeat with struct, [RepeatTag][Tag1][Value1][Tag2]Value2]...
-			if repeat.fieldName != "" {
+			if repeat.opts != nil {
 				fieldBuff := proto.NewBuffer([]byte{})
 				for count := 0; count < rowCount; count++ {
 					fieldBuff.Reset()
@@ -412,11 +510,11 @@ func (pr *ProtoSheet) readRow(row *xlsx.Row) []byte {
 					if err != nil {
 						log.Fatal(err)
 					}
-					for _, val := range repeat.fields {
+					for _, val := range repeat.opts.fields {
 						// if the rest of a row is blank
 						cell := new(xlsx.Cell)
-						if len(row.Cells) > val.colIdx+count*(repeat.fieldLength+1) {
-							cell = row.Cells[val.colIdx+count*(repeat.fieldLength+1)]
+						if len(row.Cells) > val.colIdx+count*(repeat.opts.maxLength+1) {
+							cell = row.Cells[val.colIdx+count*(repeat.opts.maxLength+1)]
 						}
 						err := readCell(fieldBuff, val, cell) // next variable position = current position + field length + 1
 						if err != nil {
@@ -429,22 +527,16 @@ func (pr *ProtoSheet) readRow(row *xlsx.Row) []byte {
 						log.Fatal(err)
 					}
 				}
-			} else { // repeat without struct [Tag][Value][Tag][Value]...
-				if len(repeat.fields) == 0 {
-					continue
-				}
-
-				val := repeat.fields[0]
-
+			} else if repeat.val != nil { // repeat without struct [Tag][Value][Tag][Value]...
 				for count := 0; count < rowCount; count++ {
 					cell := new(xlsx.Cell)
-					if len(row.Cells) > val.colIdx+count {
-						cell = row.Cells[val.colIdx+count]
+					if len(row.Cells) > repeat.colIdx+count+1 {
+						cell = row.Cells[repeat.colIdx+count+1]
 					}
 
-					err := readCell(rowBuff, val, cell) // next variable position = current position + field length + 1
+					err := readCell(rowBuff, repeat.val, cell) // next variable position = current position + field length + 1
 					if err != nil {
-						log.Printf("readCell to repeat %+v val %+v failed, %v", repeat, val, err)
+						log.Printf("readCell to repeat %+v val %+v failed, %v", repeat, repeat.val, err)
 					}
 				}
 			}

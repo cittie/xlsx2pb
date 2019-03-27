@@ -2,6 +2,7 @@ package lib
 
 import (
 	"encoding/hex"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -14,43 +15,77 @@ func genTestProtoRow() *ProtoSheet {
 
 	// Field
 	sh := &Val{
-		colIdx:          0,
+		CommonInfo: CommonInfo{
+			colIdx:   0,
+			fieldNum: 1,
+			name:     "TestField1",
+			comment:  "* This is TestFiled1 *",
+		},
 		proto2Type:      "optional",
 		typ:             "string",
-		name:            "TestField1",
-		comment:         "* This is TestFiled1 *",
 		defaultValueStr: `"default"`,
-		fieldNum:        1,
-	}
-
-	// Repeat Field
-	sh2 := &Val{
-		colIdx:          1,
-		proto2Type:      "optional",
-		typ:             "int64",
-		name:            "TestRepeat1",
-		comment:         "** This is TestRepeat1 **",
-		defaultValueStr: "0",
-		fieldNum:        1,
 	}
 
 	pr.vars = append(pr.vars, sh)
 
-	// Repeat Struct
-	rp := &Repeat{
-		maxLength:       3,
-		fieldName:       "TestRepeatStruct",
-		fieldLength:     1,
-		repeatIdx:       1,
-		defaultValueStr: `""`,
-		fieldNum:        2,
+	// opt struct
+	optS := &OptStruct{
+		CommonInfo: CommonInfo{
+			colIdx:   3,
+			fieldNum: 3,
+			name:     "TestOptStruct",
+			comment:  "TestOptStructData",
+		},
 	}
 
-	rp.fields = append(rp.fields, sh2)
+	optS.fields = append(optS.fields, sh)
+	pr.optStructs = append(pr.optStructs, optS)
 
-	pr.repeats = append(pr.repeats, rp)
+	// Repeat Field
+	sh2 := &Val{
+		CommonInfo: CommonInfo{
+			colIdx:   1,
+			fieldNum: 1,
+			name:     "TestRepeat1",
+			comment:  "** This is TestRepeat1 **",
+		},
+		proto2Type:      "optional",
+		typ:             "int64",
+		defaultValueStr: "0",
+	}
+
+	// Repeat Struct
+	rp := &Repeat{
+		CommonInfo: CommonInfo{
+			colIdx:   2,
+			fieldNum: 2,
+			name:     "TestRepeatStruct",
+			comment:  "TestRepeatStructData",
+		},
+		repeatIdx: 1,
+	}
+
+	rp2 := new(Repeat)
+	*rp2 = *rp
+
+	rp.val = sh2
+
+	rp2.opts = optS
+	rp2.val = nil
+
+	pr.repeats = append(pr.repeats, rp, rp2)
 
 	return pr
+}
+
+func TestProtoSheet_GenProto(t *testing.T) {
+	pr := genTestProtoRow()
+
+	pr.GenProto()
+
+	for _, line := range pr.outProto {
+		fmt.Println(line)
+	}
 }
 
 func TestAddMessageProto2(t *testing.T) {

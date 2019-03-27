@@ -28,6 +28,11 @@ func (pr *ProtoSheet) GenProto() {
 		pr.AddVal(val)
 	}
 
+	// Optional Struct
+	for _, optS := range pr.optStructs {
+		pr.AddOptionalStruct(optS)
+	}
+
 	// Repeats
 	for _, repeat := range pr.repeats {
 		pr.AddRepeat(repeat)
@@ -89,16 +94,26 @@ func (pr *ProtoSheet) AddMessageHead(name string) {
 
 // AddOneDefine add a proto defination
 func (pr *ProtoSheet) AddOneDefine(isRepeat bool, comment, p2type, typ, name, defaultValStr string, idx int) {
+	// default value
 	defaultStr := fmt.Sprintf(" [default = %v]", defaultValStr)
+	if defaultValStr == "" {
+		defaultStr = ""
+	}
+
+	// comment
 	if comment != "" {
 		pr.outProto = append(pr.outProto, fmt.Sprintf("%s/* %s */", curIndent, comment)) // comment
 	}
+
+	// name
 	if name == "" {
 		name = title2Lowercase(strings.TrimSpace(typ)) // struct use type name as name
 		if name == "" {                                // if name is still missing, use a default name
 			name = defaultStructureName
 		}
 	}
+
+	// type
 	if typ == "float32" { // convert go varient name to proto varient name
 		typ = "float"
 	}
@@ -110,8 +125,9 @@ func (pr *ProtoSheet) AddOneDefine(isRepeat bool, comment, p2type, typ, name, de
 	}
 	if isRepeat {
 		typ = "repeated " + typ
-		defaultStr = ""
 	}
+
+	// generate line
 	pr.outProto = append(pr.outProto, fmt.Sprintf("%s%s %s = %d%v;", curIndent, typ, name, idx, defaultStr)) // define
 }
 
@@ -127,18 +143,31 @@ func (pr *ProtoSheet) AddVal(sh *Val) {
 	pr.AddOneDefine(false, sh.comment, sh.proto2Type, sh.typ, sh.name, sh.defaultValueStr, sh.fieldNum)
 }
 
+func (pr *ProtoSheet) AddOptionalStruct(optS *OptStruct) {
+	pr.AddOneEmptyLine()
+
+	pr.AddMessageHead(optS.name)
+
+	for _, val := range optS.fields {
+		pr.AddVal(val)
+	}
+
+	pr.AddMessageTail()
+
+	pr.AddOptStructTail(optS)
+}
+
 // AddRepeat add repeat struct
 func (pr *ProtoSheet) AddRepeat(repeat *Repeat) {
 	pr.AddOneEmptyLine()
 
-	if repeat.fieldName != "" {
-		// Add message head
-		pr.AddMessageHead(repeat.fieldName)
+	if repeat.opts != nil {
+		pr.AddMessageHead(repeat.opts.name)
 
-		// Add repeat vals
-		pr.AddRepeatDefine(repeat)
+		for _, val := range repeat.opts.fields {
+			pr.AddVal(val)
+		}
 
-		// Add message tail
 		pr.AddMessageTail()
 	}
 
@@ -146,27 +175,18 @@ func (pr *ProtoSheet) AddRepeat(repeat *Repeat) {
 	pr.AddRepeatTail(repeat)
 }
 
-// AddRepeatDefine add repeat inner define
-func (pr *ProtoSheet) AddRepeatDefine(repeat *Repeat) {
-	if repeat.fieldName == "" {
+// AddRepeatTail add repeat declare
+func (pr *ProtoSheet) AddRepeatTail(repeat *Repeat) {
+	if repeat.val != nil {
+		pr.AddOneDefine(true, repeat.val.comment, "", repeat.val.typ, repeat.val.name, "", repeat.fieldNum)
 		return
 	}
 
-	for _, sh := range repeat.fields {
-		pr.AddOneDefine(false, sh.comment, sh.proto2Type, sh.typ, sh.name, sh.defaultValueStr, sh.fieldNum)
-	}
+	pr.AddOneDefine(true, "", "", repeat.name, repeat.comment, "", repeat.fieldNum)
 }
 
-// AddRepeatTail add repeat declare
-func (pr *ProtoSheet) AddRepeatTail(repeat *Repeat) {
-	if repeat.fieldName != "" {
-		pr.AddOneDefine(true, repeat.fieldName, "", repeat.fieldName, repeat.comment, repeat.defaultValueStr, repeat.fieldNum)
-	} else {
-		if len(repeat.fields) != 0 {
-			val := repeat.fields[0]
-			pr.AddOneDefine(true, val.comment, "", val.typ, val.name, "", repeat.fieldNum)
-		}
-	}
+func (pr *ProtoSheet) AddOptStructTail(opts *OptStruct) {
+	pr.AddOneDefine(false, "", "optional", opts.name, opts.comment, "", opts.fieldNum)
 }
 
 // AddMessageArray add an array for current message as XXX_ARRAY

@@ -31,7 +31,7 @@ type Cacher struct {
 	ProtoInfos map[string]*DataInfo `json:"proto_info"`
 	DataInfos  map[string]*DataInfo `json:"data_info"`
 
-	mutex sync.RWMutex `json:"-"`
+	mutex sync.RWMutex
 }
 
 // XlsxInfo contains sheet information in xlsx files

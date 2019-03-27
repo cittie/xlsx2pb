@@ -137,6 +137,8 @@ func (c *Config) LoadConfig() {
 	}
 
 	*c = ccfg.Config
+
+	c.CheckDirs()
 }
 
 func (c *Config) ReplaceRelPaths() {

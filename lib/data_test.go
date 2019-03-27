@@ -53,11 +53,11 @@ func TestReadHeads(t *testing.T) {
 
 	assert.Equal(t, 1, len(pr.repeats))
 	assert.Equal(t, 3, pr.repeats[0].maxLength)
-	assert.Equal(t, 3, len(pr.repeats[0].fields))
-	assert.Equal(t, 3, pr.repeats[0].fieldLength)
-	assert.Equal(t, "string", pr.repeats[0].fields[0].typ)
-	assert.Equal(t, "RewardID", pr.repeats[0].fields[0].name)
-	assert.Equal(t, "Comment4", pr.repeats[0].fields[0].comment)
+	assert.Equal(t, 3, len(pr.repeats[0].opts.fields))
+	assert.Equal(t, 3, pr.repeats[0].opts.maxLength)
+	assert.Equal(t, "string", pr.repeats[0].opts.fields[0].typ)
+	assert.Equal(t, "RewardID", pr.repeats[0].opts.fields[0].name)
+	assert.Equal(t, "Comment4", pr.repeats[0].opts.fields[0].comment)
 }
 
 /*func TestWriteProto(t *testing.T) {
