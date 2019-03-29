@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/tealeg/xlsx"
@@ -20,6 +21,8 @@ type ProtoSheet struct {
 	ProtoIn
 	ProtoOut
 	buf *proto.Buffer
+
+	mutex sync.RWMutex
 }
 
 // ProtoIn contains data read from xlsx
@@ -29,7 +32,8 @@ type ProtoIn struct {
 	repeats    []*Repeat
 	optStructs []*OptStruct
 	dataHash   []byte
-	fieldMap   map[string]int // map[fieldName]index in vars/opt structs/repeats
+	fieldMap   map[string]int      // map[fieldName]index in vars/opt structs/repeats
+	dupMap     map[string]struct{} // map[fieldName] to check if field name has been used in current sheet
 }
 
 // ProtoOut controls how to output proto file
@@ -248,7 +252,7 @@ func (pr *ProtoSheet) updateHeads(sheet *xlsx.Sheet) {
 							curRepeat = nil
 						}
 					} else {
-						// fmt.Printf("%v col %v curOptS %+v\n", pr.Name, colIdx, curOptS)
+						fmt.Printf("%v col %v curOptS %+v\n", pr.Name, colIdx, curOptS)
 						pr.updateOptStruct(curOptS)
 					}
 
@@ -256,8 +260,7 @@ func (pr *ProtoSheet) updateHeads(sheet *xlsx.Sheet) {
 				}
 			case curRepeat != nil && curOptS == nil: // Check repeat variant
 				if curRepeat.opts != nil {
-					log.Fatal("sheet struct invalid")
-					return
+					panic(fmt.Errorf("sheet struct invalid, max repeat value exceed"))
 				}
 
 				if curRepeat.val == nil {
@@ -304,12 +307,27 @@ func (pr *ProtoSheet) updateHeads(sheet *xlsx.Sheet) {
 	*/
 }
 
+func (pr *ProtoSheet) checkDupHead(info *CommonInfo) {
+	pr.mutex.Lock()
+	defer pr.mutex.Unlock()
+
+	if _, ok := pr.dupMap[info.name]; ok {
+		panic(fmt.Errorf("Verify failed! Duplicate name %v found in column %v of %v!!!\n", info.name, info.colIdx, pr.Name))
+	}
+	pr.dupMap[info.name] = struct{}{}
+}
+
 // updateVal if a variable is already in ProtoSheet, update its value, else add it
 func (pr *ProtoSheet) updateVal(val *Val) {
 	if val.name == "" {
 		log.Printf("val %+v without name\n", val)
 		return
 	}
+
+	pr.checkDupHead(&val.CommonInfo)
+
+	pr.mutex.Lock()
+	defer pr.mutex.Unlock()
 
 	if idx, ok := pr.fieldMap[val.name]; ok {
 		// update
@@ -338,6 +356,11 @@ func (pr *ProtoSheet) updateOptStruct(optS *OptStruct) {
 		log.Printf("optional struct %+v without name\n", optS)
 		return
 	}
+
+	pr.checkDupHead(&optS.CommonInfo)
+
+	pr.mutex.Lock()
+	defer pr.mutex.Unlock()
 
 	idx, ok := pr.fieldMap[optS.name]
 	if ok {
@@ -376,6 +399,11 @@ func (pr *ProtoSheet) updateRepeat(repeat *Repeat) {
 		return
 	}
 
+	pr.checkDupHead(&repeat.CommonInfo)
+
+	pr.mutex.Lock()
+	defer pr.mutex.Unlock()
+
 	idx, ok := pr.fieldMap[repeat.name]
 	if ok {
 		if repeat.maxLength == pr.repeats[idx].maxLength {
@@ -403,6 +431,8 @@ func (pr *ProtoSheet) updateRepeat(repeat *Repeat) {
 
 // resetAllIndex will set all variables including which are inside repeat structure to -1
 func (pr *ProtoSheet) resetAllIndex() {
+	pr.dupMap = make(map[string]struct{})
+
 	for _, val := range pr.vars {
 		val.colIdx = -1
 	}
