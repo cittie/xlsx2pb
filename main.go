@@ -8,6 +8,7 @@ import (
 
 func main() {
 	var useCache = flag.Bool("cache", true, "Use cache for current xlsx")
+	var useGoroutine = flag.Bool("goroutine", true, "Use goroutine for faster handling")
 
-	lib.Run(*useCache)
+	lib.Run(*useCache, *useGoroutine)
 }
