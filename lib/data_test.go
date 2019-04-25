@@ -92,7 +92,8 @@ func TestReadCell(t *testing.T) {
 		{"86942", "uint64", []byte{0, 158, 167, 5}},
 		{"128", "sint32", []byte{0, 128, 2}},
 		{"-2", "sint64", []byte{0, 3}},
-		{"0.125", "float", []byte{5, 0, 0, 0, 0}},
+		{"-0.85", "float", []byte{5, 0x9a, 0x99, 0x59, 0xbf}},
+		{"0.8", "double", []byte{1, 0x9a, 0x99, 0x99, 0x99, 0x99, 0x99, 0xe9, 0x3f}},
 		{"testing", "string", []byte{2, 7, 116, 101, 115, 116, 105, 110, 103}},
 	}
 

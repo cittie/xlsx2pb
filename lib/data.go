@@ -631,7 +631,7 @@ func readCell(b *proto.Buffer, val *Val, cell *xlsx.Cell) error {
 		if err != nil {
 			return err
 		}
-		err = b.EncodeFixed32(uint64(math.Float64bits(floatVal)))
+		err = b.EncodeFixed32(uint64(math.Float32bits(float32(floatVal))))
 		if err != nil {
 			return err
 		}
@@ -644,7 +644,7 @@ func readCell(b *proto.Buffer, val *Val, cell *xlsx.Cell) error {
 		if err != nil {
 			return err
 		}
-		err = b.EncodeFixed64(uint64(math.Float32bits(float32(floatVal))))
+		err = b.EncodeFixed64(uint64(math.Float64bits(floatVal)))
 		if err != nil {
 			return err
 		}
