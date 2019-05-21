@@ -121,32 +121,46 @@ func newOptStruct() *OptStruct {
 
 // ReadSheet Read data pair from *.config
 func ReadSheet(fileName, sheetName string) error {
-	fmt.Printf("reading %v for sheets %v\n", fileName, sheetName)
-
-	xlsxFullName := filepath.Join(cfg.XlsxPath, fileName+cfg.XlsxExt)
-	if _, err := os.Stat(xlsxFullName); os.IsNotExist(err) {
-		return fmt.Errorf("file %s does not exists", fileName)
-	}
-
-	xlsxFile, err := xlsx.OpenFile(xlsxFullName)
-	if err != nil {
-		return err
-	}
-
-	// Verify all sheets exists in file
-	sheetNames := strings.Split(sheetName, ",")
 	sheets := make([]*xlsx.Sheet, 0)
-	for _, sheetName := range sheetNames {
-		xlsxSheet, ok := xlsxFile.Sheet[sheetName]
-		if !ok {
-			return fmt.Errorf("xlsx file %s does not contain sheet %s", fileName, sheetName)
+	var preName string
+
+	files := strings.Split(fileName, "|")
+	if len(files) > 1 {
+		preName = sheetName
+	}
+
+	for _, fn := range files {
+		fmt.Printf("reading %v for sheets %v\n", fn, sheetName)
+
+		xlsxFullName := filepath.Join(cfg.XlsxPath, fn+cfg.XlsxExt)
+		if _, err := os.Stat(xlsxFullName); os.IsNotExist(err) {
+			return fmt.Errorf("file %s does not exists", fn)
 		}
 
-		sheets = append(sheets, xlsxSheet)
+		xlsxFile, err := xlsx.OpenFile(xlsxFullName)
+		if err != nil {
+			return err
+		}
+
+		// Verify all sheets exists in file
+		sheetNames := strings.Split(sheetName, ",")
+		if len(sheetNames) > 1 {
+			sections := strings.Split(fileName, ".")
+			preName = sections[0]
+		}
+
+		for _, sheetName := range sheetNames {
+			xlsxSheet, ok := xlsxFile.Sheet[sheetName]
+			if !ok {
+				return fmt.Errorf("xlsx file %s does not contain sheet %s", fn, sheetName)
+			}
+
+			sheets = append(sheets, xlsxSheet)
+		}
 	}
 
 	// Marshal data
-	if err := readSheets(fileName, sheets); err != nil {
+	if err := readSheets(preName, sheets); err != nil {
 		return err
 	}
 
@@ -155,14 +169,14 @@ func ReadSheet(fileName, sheetName string) error {
 	return nil
 }
 
-func readSheets(filename string, sheets []*xlsx.Sheet) error {
+func readSheets(preName string, sheets []*xlsx.Sheet) error {
 	pr := newProtoRow()
 
 	hasGenProto := false
 
 	// use filename instead of sheet name if sheets are more than 1
 	if len(sheets) > 1 {
-		pr.Name = strings.TrimSpace(strings.TrimSuffix(filename, ".xlsx"))
+		pr.Name = preName
 	}
 
 	for _, sheet := range sheets {
@@ -495,6 +509,11 @@ func (rp *Repeat) getCount(row *xlsx.Row) int {
 func (pr *ProtoSheet) readRow(row *xlsx.Row) []byte {
 	rowBuff := proto.NewBuffer([]byte{})
 	var err error
+
+	// if first cell of a line is empty, ignore this line
+	if len(row.Cells) > 0 && strings.TrimSpace(row.Cells[0].Value) == "" {
+		return nil
+	}
 
 	readval := func(idx int, val *Val, b *proto.Buffer) error {
 		var e error

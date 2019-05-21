@@ -124,6 +124,11 @@ func (c *Cacher) Save() error {
 		return err
 	}
 
+	CacheDir := filepath.Dir(cfg.CacheFile)
+	if err := os.MkdirAll(CacheDir, 0777); err != nil {
+		log.Fatal(err)
+	}
+
 	err = ioutil.WriteFile(cfg.CacheFile, rawData, 0644)
 	if err != nil {
 		return err

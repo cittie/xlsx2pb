@@ -39,6 +39,15 @@ func IsXlsxChanged(filename string) bool {
 		return true
 	}
 
+	// Add support for multi files
+	if filenames := strings.Split(filename, "|"); len(filenames) > 1 {
+		changed := false
+		for _, fn := range filenames {
+			changed = changed || IsXlsxChanged(fn)
+		}
+		return changed
+	}
+
 	fname := filepath.Join(cfg.XlsxPath, filename+cfg.XlsxExt)
 
 	cacher.mutex.Lock()

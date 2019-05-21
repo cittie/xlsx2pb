@@ -5,9 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"path"
 	"path/filepath"
-	"runtime"
 	"strings"
 
 	"github.com/BurntSushi/toml"
@@ -114,19 +112,32 @@ func readCfgLine(cfgLine string) error {
 		sheetNames[sheet] = struct{}{}
 	}
 
-	sheetFileMap[filename] = append(sheetFileMap[filename], parts[0])
+	// check multiple sheet names are the same
+	sheets = strings.Split(parts[0], "|")
+	if len(sheets) > 1 {
+		sheetName := sheets[0]
+		for _, sheet := range sheets { // verify only
+			if sheetName != sheet {
+				fmt.Printf("sheet name %s and %s differs\n", sheet, sheetName) // Enable duplicate sheet names
+				continue
+			}
+		}
+		sheetFileMap[filename] = append(sheetFileMap[filename], sheetName)
+	} else {
+		sheetFileMap[filename] = append(sheetFileMap[filename], parts[0])
+	}
 
 	return nil
 }
 
 func (c *Config) LoadConfig() {
-	_, filename, _, ok := runtime.Caller(0)
-	if !ok {
-		panic("No caller information!")
-	}
+	/*	_, filename, _, ok := runtime.Caller(0)
+		if !ok {
+			panic("No caller information!")
+		}
 
-	cfgFile := filepath.Join(path.Dir(filename), "../conf/config.toml")
-
+		cfgFile := filepath.Join(path.Dir(filename), "../conf/config.toml")*/
+	cfgFile := "./conf/config.toml"
 	if _, err := os.Stat(cfgFile); os.IsNotExist(err) {
 		panic("Config file does not exits!")
 	}
