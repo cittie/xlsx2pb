@@ -32,8 +32,9 @@ type ProtoIn struct {
 	repeats    []*Repeat
 	optStructs []*OptStruct
 	dataHash   []byte
-	fieldMap   map[string]int      // map[fieldName]index in vars/opt structs/repeats
-	dupMap     map[string]struct{} // map[fieldName] to check if field name has been used in current sheet
+	fieldMap   map[string]int                 // map[fieldName]index in vars/opt structs/repeats
+	dupMap     map[string]struct{}            // map[fieldName] to check if field name has been used in current sheet
+	uniqueMap  map[string]map[string]struct{} // map[fieldName][uniqueName] to check if unique type of variant has duplicates
 }
 
 // ProtoOut controls how to output proto file
@@ -60,6 +61,7 @@ const (
 	Opt     = "optional"
 	Rep     = "repeated"
 	OptStru = "optional_struct"
+	Unique  = "unique"
 )
 
 // Val contains fields for .proto file
@@ -101,7 +103,7 @@ func newProtoRow() *ProtoSheet {
 	pr.isProto3 = cfg.UseProto3
 	pr.varIdx = 1
 	pr.buf = proto.NewBuffer([]byte{})
-
+	pr.uniqueMap = make(map[string]map[string]struct{})
 	return pr
 }
 
@@ -227,7 +229,7 @@ func (pr *ProtoSheet) updateHeads(sheet *xlsx.Sheet) {
 		}
 
 		switch headType {
-		case Req, Opt:
+		case Req, Opt, Unique:
 			val := new(Val)
 			val.colIdx = colIdx
 			val.proto2Type = headType
@@ -329,6 +331,22 @@ func (pr *ProtoSheet) checkDupHead(info *CommonInfo) {
 		panic(fmt.Errorf("Verify failed! Duplicate name %v found in column %v of %v!!!\n", info.name, info.colIdx, pr.Name))
 	}
 	pr.dupMap[info.name] = struct{}{}
+}
+
+func (pr *ProtoSheet) checkDupUnique(varName, varValue string) error {
+	pr.mutex.Lock()
+	defer pr.mutex.Unlock()
+
+	if _, ok := pr.uniqueMap[varName]; !ok {
+		pr.uniqueMap[varName] = make(map[string]struct{}, 256)
+	}
+
+	if _, ok := pr.uniqueMap[varName][varValue]; ok {
+		return fmt.Errorf("duplicate unique %s in %s", varValue, varName)
+	}
+
+	pr.uniqueMap[varName][varValue] = struct{}{}
+	return nil
 }
 
 // updateVal if a variable is already in ProtoSheet, update its value, else add it
@@ -520,6 +538,12 @@ func (pr *ProtoSheet) readRow(row *xlsx.Row) []byte {
 		if val.colIdx == -1 { // sheet has no field
 			e = readCell(b, val, new(xlsx.Cell))
 		} else if val.colIdx < len(row.Cells) {
+			// check unique type data is really unique
+			if val.proto2Type == Unique {
+				if err := pr.checkDupUnique(val.name, row.Cells[val.colIdx].Value); err != nil {
+					panic(err)
+				}
+			}
 			e = readCell(b, val, row.Cells[val.colIdx]) // Variable part of data
 		} else { // sheet cell is empty
 			e = readCell(b, val, new(xlsx.Cell))

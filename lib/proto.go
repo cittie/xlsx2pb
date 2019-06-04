@@ -121,6 +121,9 @@ func (pr *ProtoSheet) AddOneDefine(isRepeat bool, comment, p2type, typ, name, de
 		typ = "double"
 	}
 	if !pr.isProto3 && p2type != "" { // only for proto2
+		if p2type == Unique {
+			p2type = Opt
+		}
 		typ = fmt.Sprintf("%s %s", p2type, typ)
 	}
 	if isRepeat {
