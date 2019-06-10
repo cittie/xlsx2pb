@@ -95,6 +95,7 @@ func TestReadCell(t *testing.T) {
 		{"-0.85", "float", []byte{5, 0x9a, 0x99, 0x59, 0xbf}},
 		{"0.8", "double", []byte{1, 0x9a, 0x99, 0x99, 0x99, 0x99, 0x99, 0xe9, 0x3f}},
 		{"testing", "string", []byte{2, 7, 116, 101, 115, 116, 105, 110, 103}},
+		{" testing \t", "string", []byte{2, 7, 116, 101, 115, 116, 105, 110, 103}},
 	}
 
 	cell := new(xlsx.Cell)

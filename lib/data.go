@@ -696,7 +696,7 @@ func readCell(b *proto.Buffer, val *Val, cell *xlsx.Cell) error {
 		if err != nil {
 			return err
 		}
-		err = b.EncodeStringBytes(cell.Value) // length included
+		err = b.EncodeStringBytes(strings.TrimSpace(cell.Value)) // length included, and also remove extra spaces for string type
 		if err != nil {
 			return err
 		}
