@@ -85,29 +85,35 @@ func TestReadCell(t *testing.T) {
 		cellValue string
 		readType  string
 		expected  []byte
+		err       error
 	}{
-		{"3", "int32", []byte{0, 3}},
-		{"150", "uint32", []byte{0, 150, 1}},
-		{"270", "int64", []byte{0, 142, 2}},
-		{"86942", "uint64", []byte{0, 158, 167, 5}},
-		{"128", "sint32", []byte{0, 128, 2}},
-		{"-2", "sint64", []byte{0, 3}},
-		{"-0.85", "float", []byte{5, 0x9a, 0x99, 0x59, 0xbf}},
-		{"0.8", "double", []byte{1, 0x9a, 0x99, 0x99, 0x99, 0x99, 0x99, 0xe9, 0x3f}},
-		{"testing", "string", []byte{2, 7, 116, 101, 115, 116, 105, 110, 103}},
-		{" testing \t", "string", []byte{2, 7, 116, 101, 115, 116, 105, 110, 103}},
+		{"3", "int32", []byte{0, 3}, nil},
+		{"150", "uint32", []byte{0, 150, 1}, nil},
+		{"270", "int64", []byte{0, 142, 2}, nil},
+		{"86942", "uint64", []byte{0, 158, 167, 5}, nil},
+		{"128", "sint32", []byte{0, 128, 2}, nil},
+		{"-2", "sint64", []byte{0, 3}, nil},
+		{"-0.85", "float", []byte{5, 0x9a, 0x99, 0x59, 0xbf}, nil},
+		{"0.8", "double", []byte{1, 0x9a, 0x99, 0x99, 0x99, 0x99, 0x99, 0xe9, 0x3f}, nil},
+		{"testing", "string", []byte{2, 7, 116, 101, 115, 116, 105, 110, 103}, nil},
+		{" testing \t", "string", []byte{2, 7, 116, 101, 115, 116, 105, 110, 103}, nil},
+		{"2147483648", "int32", []byte{0}, ErrFormatInvalid},
+		{"-1", "uint32", []byte{0}, ErrFormatInvalid},
+		{"-9223372036854775809", "int64", []byte{0}, ErrFormatInvalid},
+		{"-5", "uint64", []byte{0}, ErrFormatInvalid},
 	}
 
 	cell := new(xlsx.Cell)
 	buff := proto.NewBuffer([]byte{})
 	val := new(Val)
 
-	for _, test := range tests {
+	for i, test := range tests {
 		buff.Reset()
 		val.typ = test.readType
 		cell.SetString(test.cellValue)
-		readCell(buff, val, cell)
-		assert.Equal(t, test.expected, buff.Bytes())
+		err := readCell(buff, val, cell)
+		assert.Equal(t, test.expected, buff.Bytes(), i)
+		assert.Equal(t, test.err, err, i)
 	}
 }
 

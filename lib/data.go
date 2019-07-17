@@ -3,16 +3,23 @@ package lib
 import (
 	"bufio"
 	"crypto/md5"
+	"errors"
 	"fmt"
 	"log"
 	"math"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/tealeg/xlsx"
+)
+
+var (
+	ErrRequiredFieldEmpty = errors.New("required field is empty")
+	ErrFormatInvalid      = errors.New("invalid cell value")
 )
 
 // ProtoSheet is used to generate proto file
@@ -554,7 +561,7 @@ func (pr *ProtoSheet) readRow(row *xlsx.Row) []byte {
 	for i, val := range pr.vars {
 		err = readval(i, val, rowBuff)
 		if err != nil {
-			log.Printf("readCell to val %+v failed, %v", val, err)
+			log.Fatalf("readCell to val %+v failed, %v", val, err)
 		}
 	}
 
@@ -635,6 +642,9 @@ func (pr *ProtoSheet) readRow(row *xlsx.Row) []byte {
 // readCell add "Tag - Value" or "Tag - Length - Value" to buffer according to var type
 func readCell(b *proto.Buffer, val *Val, cell *xlsx.Cell) error {
 	if strings.TrimSpace(cell.Value) == "" {
+		if val.proto2Type == Req {
+			return ErrRequiredFieldEmpty
+		}
 		return nil
 	}
 
@@ -647,6 +657,24 @@ func readCell(b *proto.Buffer, val *Val, cell *xlsx.Cell) error {
 		intVal, err := cell.Int()
 		if err != nil {
 			return err
+		}
+		switch val.typ {
+		case "int32":
+			if math.MinInt32 > intVal || intVal > math.MaxInt32 {
+				return ErrFormatInvalid
+			}
+		case "int64":
+			if strconv.Itoa(intVal) != cell.Value {
+				return ErrFormatInvalid
+			}
+		case "uint32":
+			if intVal < 0 || intVal > int(math.MaxUint32) {
+				return ErrFormatInvalid
+			}
+		case "uint64":
+			if intVal < 0 || uint(intVal) > uint(math.MaxUint64) {
+				return ErrFormatInvalid
+			}
 		}
 		err = b.EncodeVarint(uint64(intVal))
 		if err != nil {
