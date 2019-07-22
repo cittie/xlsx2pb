@@ -264,9 +264,12 @@ func (pr *ProtoSheet) updateHeads(sheet *xlsx.Sheet) {
 				curOptS.curLength--
 				if curOptS.curLength <= 0 {
 					if curRepeat != nil {
-						// TODO: check if all OptS are the same
 						if curRepeat.opts == nil {
 							curRepeat.opts = curOptS
+						} else {
+							if !isSameOptS(curOptS, curRepeat.opts) {
+								log.Printf("<Warning> %s repeated optional structs differs, current %+v, last %+v\n", pr.Name, curOptS, curRepeat.opts)
+							}
 						}
 						curRepeat.curLength--
 
@@ -288,6 +291,10 @@ func (pr *ProtoSheet) updateHeads(sheet *xlsx.Sheet) {
 
 				if curRepeat.val == nil {
 					curRepeat.val = val
+				} else {
+					if !isSameVal(val, curRepeat.val) {
+						log.Printf("<Warning> %s repeated variant differs, current %+v, last %+v\n", pr.Name, val, curRepeat.val)
+					}
 				}
 
 				curRepeat.curLength--
@@ -763,4 +770,38 @@ func (pr *ProtoSheet) DataHash() {
 	hash := md5.New()
 	hash.Write(pr.buf.Bytes())
 	pr.dataHash = hash.Sum(nil)
+}
+
+// isSameCommon compare if basic info are the same
+// allow comments are different
+func isSameCommon(src, tar CommonInfo) bool {
+	return src.name == tar.name && src.maxLength == tar.maxLength
+}
+
+// isSameVal compares if two vals have same define
+func isSameVal(src, tar *Val) bool {
+	return src.proto2Type == tar.proto2Type &&
+		src.typ == tar.typ &&
+		src.defaultValueStr == tar.defaultValueStr &&
+		isSameCommon(src.CommonInfo, tar.CommonInfo)
+}
+
+// isSameOptS compares if two optional structs have same define
+// check when optional struct is fully filled
+func isSameOptS(src, tar *OptStruct) bool {
+	if !isSameCommon(src.CommonInfo, tar.CommonInfo) {
+		return false
+	}
+
+	if len(src.fields) != len(tar.fields) {
+		return false
+	}
+
+	for i := 0; i < len(src.fields); i++ {
+		if !isSameVal(src.fields[i], tar.fields[i]) {
+			return false
+		}
+	}
+
+	return true
 }
